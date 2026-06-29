@@ -1,0 +1,7 @@
+/output/
+/.spago/
+/node_modules/
+/.purs-repl
+/.spec-results
+
+/.psci_modules/

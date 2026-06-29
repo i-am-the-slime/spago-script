@@ -1,0 +1,8 @@
+{
+  "name": "spago-script-prelude",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "spago-script": "bin/spago-script.js"
+  }
+}
