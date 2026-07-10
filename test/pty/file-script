@@ -1,0 +1,7 @@
+#!/usr/bin/env spago-script
+main = run do
+  mkdirp "output/pty-file"
+  write ("output/pty-file" / "a.txt") "a"
+  write ("output/pty-file" / "b.txt") "b"
+  value <- fileNative "output/pty-file"
+  log $ "VALUE=" <> value

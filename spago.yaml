@@ -12,6 +12,11 @@ package:
     - node-execa
     - node-fs
     - node-path
+    - node-process
+    - node-streams
+    - node-event-emitter
+    - refs
+    - js-timers
     - nullable
     - prelude
     - strings

@@ -1,0 +1,4 @@
+#!/usr/bin/env spago-script
+main = run do
+  value <- confirmNative "Proceed?"
+  log $ "VALUE=" <> show value

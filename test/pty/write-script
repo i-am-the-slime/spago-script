@@ -1,0 +1,4 @@
+#!/usr/bin/env spago-script
+main = run do
+  value <- writeNative "notes"
+  log $ "VALUE=" <> value

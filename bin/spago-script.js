@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const bin = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(bin), "..");
@@ -33,7 +33,7 @@ Scripts without a module header are wrapped as:
 ensureCache();
 
 const scriptPath = path.resolve(process.cwd(), script);
-const source = fs.readFileSync(scriptPath, "utf8");
+const source = stripShebang(fs.readFileSync(scriptPath, "utf8"));
 const parsedModule = source.match(/^\s*module\s+([A-Z][\w]*(?:\.[A-Z][\w]*)*)\s+where\b/m);
 const mainModule = parsedModule ? parsedModule[1] : "Main";
 const wrappedSource = parsedModule ? source : wrapScript(source);
@@ -45,20 +45,39 @@ copySkeleton(workdir);
 fs.mkdirSync(path.dirname(scriptModulePath), { recursive: true });
 fs.writeFileSync(scriptModulePath, wrappedSource);
 
-const result = spawnSync("spago", [
-  "run",
+const build = spawnSync("spago", [
+  "build",
   "--offline",
   "--quiet",
-  "--main",
-  mainModule,
-  ...scriptArgs
+  "--censor-stats"
 ], {
   cwd: workdir,
+  env: process.env,
+  encoding: "utf8",
+  stdio: "pipe"
+});
+
+if (build.status !== 0) {
+  process.stdout.write(build.stdout ?? "");
+  process.stderr.write(build.stderr ?? "");
+  process.exit(build.status ?? 1);
+}
+
+const runnerPath = path.join(workdir, "run.js");
+const mainPath = path.join(workdir, "output", mainModule, "index.js");
+fs.writeFileSync(runnerPath, `import { main } from ${JSON.stringify(pathToFileURL(mainPath).href)};\nmain();\n`);
+
+const result = spawnSync("bun", [ runnerPath, ...scriptArgs ], {
+  cwd: process.cwd(),
   env: process.env,
   stdio: "inherit"
 });
 
 process.exit(result.status ?? 1);
+
+function stripShebang(source) {
+  return source.startsWith("#!") ? source.replace(/^.*(?:\r?\n|$)/, "") : source;
+}
 
 function wrapScript(source) {
   const annotation = /^\s*main\s*::/m.test(source) ? "" : "main :: Effect Unit\n";
@@ -68,21 +87,27 @@ function wrapScript(source) {
 function ensureCache() {
   const stamp = path.join(cacheDir, ".stamp");
   const expectedStamp = cacheStamp();
-  if (fs.existsSync(stamp) && fs.readFileSync(stamp, "utf8") === expectedStamp) return;
+  if (cacheIsFresh(stamp, expectedStamp)) return;
 
   fs.rmSync(cacheDir, { force: true, recursive: true });
   fs.mkdirSync(cacheDir, { recursive: true });
   copyProjectFiles(cacheDir);
-  linkPackages(cacheDir);
-
-  run("spago", [ "build", "--offline", "--quiet" ], { cwd: cacheDir, stdio: "inherit" });
+  run("spago", cacheBuildArgs(), { cwd: cacheDir });
   fs.writeFileSync(stamp, expectedStamp);
 }
 
 function copySkeleton(workdir) {
+  ensureCache();
   copyProjectFiles(workdir);
   linkPackages(workdir);
   fs.symlinkSync(path.join(cacheDir, "output"), path.join(workdir, "output"), "dir");
+}
+
+function cacheIsFresh(stamp, expectedStamp) {
+  return fs.existsSync(stamp)
+    && fs.readFileSync(stamp, "utf8") === expectedStamp
+    && fs.existsSync(path.join(cacheDir, "output"))
+    && fs.existsSync(path.join(cacheDir, "output", "cache-db.json"));
 }
 
 function copyProjectFiles(directory) {
@@ -90,15 +115,28 @@ function copyProjectFiles(directory) {
   fs.copyFileSync(path.join(root, "spago.lock"), path.join(directory, "spago.lock"));
   fs.mkdirSync(path.join(directory, "src", "Script"), { recursive: true });
   fs.copyFileSync(path.join(root, "src", "Script", "Prelude.purs"), path.join(directory, "src", "Script", "Prelude.purs"));
-  fs.copyFileSync(path.join(root, "src", "Script", "Prelude.js"), path.join(directory, "src", "Script", "Prelude.js"));
+  copyIfExists(path.join(root, "src", "Script", "Prelude.js"), path.join(directory, "src", "Script", "Prelude.js"));
 }
 
 function linkPackages(directory) {
-  const cachedPackages = path.join(root, ".spago");
+  const packages = packageStore();
   const tempPackages = path.join(directory, ".spago");
-  if (fs.existsSync(cachedPackages) && !fs.existsSync(tempPackages)) {
-    fs.symlinkSync(cachedPackages, tempPackages, "dir");
+  if (packages && packages !== tempPackages && !fs.existsSync(tempPackages)) {
+    fs.symlinkSync(packages, tempPackages, "dir");
   }
+}
+
+function packageStore() {
+  const rootPackages = path.join(root, ".spago");
+  const cachePackages = path.join(cacheDir, ".spago");
+  if (fs.existsSync(rootPackages)) return rootPackages;
+  if (fs.existsSync(cachePackages)) return cachePackages;
+  return null;
+}
+
+function cacheBuildArgs() {
+  const args = [ "build", "--quiet", "--censor-stats" ];
+  return packageStore() ? [ "build", "--offline", "--quiet", "--censor-stats" ] : args;
 }
 
 function cacheStamp() {
@@ -106,8 +144,16 @@ function cacheStamp() {
     fs.readFileSync(path.join(root, "spago.yaml"), "utf8"),
     fs.readFileSync(path.join(root, "spago.lock"), "utf8"),
     fs.readFileSync(path.join(root, "src", "Script", "Prelude.purs"), "utf8"),
-    fs.readFileSync(path.join(root, "src", "Script", "Prelude.js"), "utf8")
+    readIfExists(path.join(root, "src", "Script", "Prelude.js"))
   ].join("\n--- spago-script cache boundary ---\n");
+}
+
+function copyIfExists(from, to) {
+  if (fs.existsSync(from)) fs.copyFileSync(from, to);
+}
+
+function readIfExists(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
 }
 
 function run(command, args, options = {}) {

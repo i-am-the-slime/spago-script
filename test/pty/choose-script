@@ -1,0 +1,4 @@
+#!/usr/bin/env spago-script
+main = run do
+  value <- chooseNative [ "app", "library", "script" ]
+  log $ "VALUE=" <> value

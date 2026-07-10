@@ -1,0 +1,4 @@
+#!/usr/bin/env spago-script
+main = run do
+  value <- select [ "PureScript", "TypeScript", "Zig", "Go", "Rust" ]
+  log $ "VALUE=" <> value

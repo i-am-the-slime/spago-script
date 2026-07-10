@@ -1,0 +1,7 @@
+#!/usr/bin/env expect
+set timeout 60
+set script [lindex $argv 0]
+spawn /Users/mark/code/spago-script/bin/spago-script.js $script
+expect -re {Choose:}
+send "\033\[B\r"
+expect -re {VALUE=library}

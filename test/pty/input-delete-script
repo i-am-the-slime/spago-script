@@ -1,0 +1,4 @@
+#!/usr/bin/env spago-script
+main = run do
+  value <- inputNative "project name"
+  log $ "VALUE=" <> value

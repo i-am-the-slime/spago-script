@@ -1,0 +1,8 @@
+#!/usr/bin/env expect
+set timeout 60
+set script [lindex $argv 0]
+spawn /Users/mark/code/spago-script/bin/spago-script.js $script
+expect -re {Write:}
+send "hello\rworld\004"
+expect -re {VALUE=hello}
+expect -re {world}

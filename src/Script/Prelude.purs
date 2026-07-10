@@ -73,16 +73,25 @@ module Script.Prelude
   , exists
   , exit
   , choose
+  , chooseNative
   , confirm
+  , confirmNative
   , ensureGum
+  , file
+  , fileNative
   , fileExists
   , go
   , gum
   , gum_
   , gumChoose
   , gumConfirm
+  , gumFile
   , gumFilter
+  , gumFormat
   , gumInput
+  , gumJoin
+  , gumLog
+  , gumPager
   , grep
   , grep_
   , grepArgs
@@ -90,16 +99,21 @@ module Script.Prelude
   , gh_
   , ghArgs
   , gumSpin
+  , gumTable
+  , gumWrite
   , head
   , head_
   , headArgs
   , here
   , input
+  , inputNative
   , isDir
   , jj
   , jj_
   , jjArgs
   , isFile
+  , joinText
+  , joinTextHorizontal
   , launch
   , link
   , listDir
@@ -130,8 +144,11 @@ module Script.Prelude
   , pursTidy
   , pursTidy_
   , pursTidyArgs
+  , markdown
   , mkdirp
   , mkdtemp
+  , pager
+  , pagerNative
   , pathJoin
   , pipeFrom
   , pipeInto
@@ -173,9 +190,13 @@ module Script.Prelude
   , stat
   , select
   , spin
+  , spinNative
   , stream
   , style
+  , styleNative
   , symlink
+  , table
+  , tableNative
   , tail
   , tail_
   , tailArgs
@@ -197,6 +218,7 @@ module Script.Prelude
   , which_
   , whichArgs
   , write
+  , writeNative
   , writeFile
   , writeTextFile
   , writeTextFileWith
@@ -215,8 +237,11 @@ import Control.Monad.Reader.Trans (asks)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
-import Data.Nullable (Nullable, toMaybe)
+import Data.Foldable (for_)
+import Data.Int as Int
 import Data.String as String
+import Data.String.CodeUnits as String.CodeUnits
+import Data.String.Pattern (Pattern(..))
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -224,13 +249,14 @@ import Data.Symbol (class IsSymbol, reflectSymbol)
 import Prim.Symbol as Symbol
 import Prim.TypeError (class Fail, Text, Beside)
 import Effect (Effect)
-import Effect.Aff (Aff)
+import Effect.Aff (Aff, Milliseconds(..))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff, liftAff)
-import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
 import Effect.Exception as Exception
+import Effect.Ref as Ref
+import Effect.Timer as Timer
 import Node.Buffer (Buffer)
 import Node.Buffer (Buffer) as Node.Buffer
 import Node.ChildProcess.Types (pipe) as ChildProcess
@@ -248,13 +274,15 @@ import Node.Library.Execa as Execa
 import Node.Path (FilePath)
 import Node.Path (FilePath) as Node.Path
 import Node.Path as Path
+import Node.Process as Process
+import Node.Stream as Stream
+import Node.EventEmitter (on)
 import Type.Proxy (Proxy(..))
 import Yoga.Format (class ParseTemplate, fmt, format)
 import Yoga.Format (fmt, format) as Yoga.Format
 import Yoga.Format.Render (class RenderInput)
 import Yoga.Om (Om)
 import Yoga.Om (Om(..), ParOm(..), delay, error, expand, expandCtx, expandErr, fatal, fromAff, handleErrors, handleErrors', inParallel, launchOm, launchOm_, mapError, note, noteM, onError, orFail, parOmToAff, race, readerT, runOm, runOmOrThrow, runOmRecord, runOms, runOmsInOm, runReader, sequenceOmRecord, tap, tapM, throw, throwLeftAs, throwLeftAsM, toOm, unliftAff, unliftAffFn, widenCtx) as Yoga.Om
-
 
 type CommandResult =
   { code :: Int
@@ -725,19 +753,13 @@ here :: forall ctx err. Om { cwd :: FilePath | ctx } err FilePath
 here = asks _.cwd
 
 args :: Effect (Array String)
-args = argvImpl
-
-foreign import argvImpl :: Effect (Array String)
+args = Array.drop 2 <$> Process.argv
 
 cwd :: Effect FilePath
-cwd = cwdImpl
-
-foreign import cwdImpl :: Effect FilePath
+cwd = Process.cwd
 
 lookupEnv :: String -> Effect (Maybe String)
-lookupEnv name = toMaybe <$> envImpl name
-
-foreign import envImpl :: String -> Effect (Nullable String)
+lookupEnv = Process.lookupEnv
 
 env :: forall m. MonadAff m => String -> m String
 env = requireEnv
@@ -748,9 +770,7 @@ requireEnv name = do
   maybe (failWith $ "Missing environment variable: " <> name) pure value
 
 exit :: Int -> Effect Unit
-exit = exitImpl
-
-foreign import exitImpl :: Int -> Effect Unit
+exit = Process.exit'
 
 access :: forall m. MonadAff m => FilePath -> m (Maybe Exception.Error)
 access path = FS.access path # liftAff
@@ -888,44 +908,44 @@ isDir :: forall m. MonadAff m => FilePath -> m Boolean
 isDir = directoryExists
 
 spawn :: forall args m. ToArgs args => MonadAff m => String -> args -> m ExecaProcess
-spawn file commandArgs = spawnWith file commandArgs identity
+spawn executable commandArgs = spawnWith executable commandArgs identity
 
 spawnWith :: forall args m. ToArgs args => MonadAff m => String -> args -> (ExecaOptions -> ExecaOptions) -> m ExecaProcess
-spawnWith file commandArgs options = Execa.execa file (toArgs commandArgs) options # liftAff
+spawnWith executable commandArgs options = Execa.execa executable (toArgs commandArgs) options # liftAff
 
 spawnPipe :: forall args m. ToArgs args => MonadAff m => String -> args -> m ExecaProcess
-spawnPipe file commandArgs = spawnWith file commandArgs stream
+spawnPipe executable commandArgs = spawnWith executable commandArgs stream
 
 spawnHere :: forall args ctx err. ToArgs args => String -> args -> Om { cwd :: FilePath | ctx } err ExecaProcess
-spawnHere file commandArgs = do
+spawnHere executable commandArgs = do
   dir <- here
-  spawnWith file commandArgs (_ { cwd = Just dir })
+  spawnWith executable commandArgs (_ { cwd = Just dir })
 
 execa :: forall args m. ToArgs args => MonadAff m => String -> args -> m ExecaResult
-execa file commandArgs = execaWith file commandArgs identity
+execa executable commandArgs = execaWith executable commandArgs identity
 
 execaWith :: forall args m. ToArgs args => MonadAff m => String -> args -> (ExecaOptions -> ExecaOptions) -> m ExecaResult
-execaWith file commandArgs options = do
-  spawned <- spawnWith file commandArgs options
+execaWith executable commandArgs options = do
+  spawned <- spawnWith executable commandArgs options
   result <- spawned.getResult # liftAff
   ensureOk result
 
 x :: forall args m. ToArgs args => MonadAff m => String -> args -> m String
-x file commandArgs = _.stdout <$> execa file commandArgs
+x executable commandArgs = _.stdout <$> execa executable commandArgs
 
 x_ :: forall args m. ToArgs args => MonadAff m => String -> args -> m Unit
-x_ file commandArgs = void $ execa file commandArgs
+x_ executable commandArgs = void $ execa executable commandArgs
 
 xWith :: forall args m. ToArgs args => MonadAff m => String -> args -> (ExecaOptions -> ExecaOptions) -> m String
-xWith file commandArgs options = _.stdout <$> execaWith file commandArgs options
+xWith executable commandArgs options = _.stdout <$> execaWith executable commandArgs options
 
 xPipe :: forall args m. ToArgs args => MonadAff m => String -> args -> m Unit
-xPipe file commandArgs = void $ execaWith file commandArgs stream
+xPipe executable commandArgs = void $ execaWith executable commandArgs stream
 
 xHere :: forall args ctx err. ToArgs args => String -> args -> Om { cwd :: FilePath | ctx } err String
-xHere file commandArgs = do
+xHere executable commandArgs = do
   dir <- here
-  xWith file commandArgs (_ { cwd = Just dir })
+  xWith executable commandArgs (_ { cwd = Just dir })
 
 cmd :: forall m. MonadAff m => String -> m String
 cmd command = _.stdout <$> cmdWith command identity
@@ -947,54 +967,721 @@ cmdHere command = do
   _.stdout <$> cmdWith command (_ { cwd = Just dir })
 
 gum :: forall args m. ToArgs args => MonadAff m => args -> m String
-gum = x gumBin
+gum commandArgs = xWith gumBin commandArgs interactive
 
 gum_ :: forall args m. ToArgs args => MonadAff m => args -> m Unit
-gum_ = x_ gumBin
+gum_ commandArgs = void $ execaWith gumBin commandArgs interactive
 
 ensureGum :: forall m. MonadAff m => m Unit
 ensureGum = gum_ "--version"
 
 choose :: forall m. MonadAff m => Array String -> m String
-choose = gumChoose
+choose = chooseNative
+
+chooseNative :: forall m. MonadAff m => Array String -> m String
+chooseNative choices = runPrompt $ choosePrompt choices
 
 gumChoose :: forall m. MonadAff m => Array String -> m String
 gumChoose choices = gum ([ "choose" ] <> choices)
 
 confirm :: forall m. MonadAff m => String -> m Boolean
-confirm = gumConfirm
+confirm = confirmNative
+
+confirmNative :: forall m. MonadAff m => String -> m Boolean
+confirmNative message = runPrompt $ confirmPrompt message
 
 gumConfirm :: forall m. MonadAff m => String -> m Boolean
 gumConfirm message = do
-  spawned <- spawn gumBin [ "confirm", message ]
+  spawned <- spawnWith gumBin [ "confirm", message ] interactive
   result <- spawned.getResult # liftAff
   case result.exit of
     Normally 0 -> pure true
     _ -> pure false
 
 input :: forall m. MonadAff m => String -> m String
-input = gumInput
+input = inputNative
+
+inputNative :: forall m. MonadAff m => String -> m String
+inputNative placeholder = runPrompt $ inputPrompt placeholder
 
 gumInput :: forall m. MonadAff m => String -> m String
 gumInput placeholder = gum [ "input", "--placeholder", placeholder ]
 
 select :: forall m. MonadAff m => Array String -> m String
-select = gumFilter
+select choices = runPrompt $ filterPrompt choices
 
 gumFilter :: forall m. MonadAff m => Array String -> m String
-gumFilter choices = pipe (String.joinWith "\n" choices) "gum filter"
+gumFilter choices = gum ([ "filter" ] <> choices)
 
-spin :: forall m. MonadAff m => String -> String -> m String
-spin = gumSpin
+file :: forall m. MonadAff m => FilePath -> m FilePath
+file = fileNative
+
+fileNative :: forall m. MonadAff m => FilePath -> m FilePath
+fileNative path = do
+  entries <- cmd $ "find " <> shellQuote path <> " -maxdepth 2 -mindepth 1 | sort"
+  select $ splitLines entries
+
+gumFile :: forall m. MonadAff m => FilePath -> m FilePath
+gumFile path = gum [ "file", path ]
+
+pager :: forall m. MonadEffect m => String -> m Unit
+pager = pagerNative
+
+pagerNative :: forall m. MonadEffect m => String -> m Unit
+pagerNative = Console.log
+
+gumPager :: forall m. MonadAff m => String -> m Unit
+gumPager text = void $ cmdWith ("printf %s " <> shellQuote text <> " | gum pager") interactive
+
+table :: forall m. MonadEffect m => Array (Array String) -> m String
+table = tableNative
+
+tableNative :: forall m. MonadEffect m => Array (Array String) -> m String
+tableNative rows = pure $ renderTable rows
+
+gumTable :: forall m. MonadAff m => Array (Array String) -> m String
+gumTable rows = cmdWith ("printf %s " <> shellQuote (toCsv rows) <> " | gum table --print") interactive <#> _.stdout
+
+markdown :: forall m. MonadEffect m => String -> m String
+markdown = pure <<< renderMarkdown
+
+gumFormat :: forall m. MonadAff m => String -> m String
+gumFormat text = cmdWith ("printf %s " <> shellQuote text <> " | gum format") interactive <#> _.stdout
+
+joinText :: forall m. MonadEffect m => Array String -> m String
+joinText = pure <<< String.joinWith "\n"
+
+joinTextHorizontal :: forall m. MonadEffect m => Array String -> m String
+joinTextHorizontal = pure <<< String.joinWith " "
+
+gumJoin :: forall m. MonadAff m => Array String -> m String
+gumJoin chunks = gum ([ "join" ] <> chunks)
+
+gumLog :: forall m. MonadAff m => Array String -> m Unit
+gumLog chunks = gum_ ([ "log" ] <> chunks)
+
+writeNative :: forall m. MonadAff m => String -> m String
+writeNative placeholder = runPrompt $ writePrompt placeholder
+
+gumWrite :: forall m. MonadAff m => String -> m String
+gumWrite placeholder = gum [ "write", "--placeholder", placeholder ]
+
+spin :: forall m. MonadAff m => String -> String -> m Unit
+spin = spinNative
+
+spinNative :: forall m. MonadAff m => String -> String -> m Unit
+spinNative title command = do
+  _ <- withSpinner title command
+  pure unit
 
 gumSpin :: forall m. MonadAff m => String -> String -> m String
 gumSpin title command = gum [ "spin", "--title", title, "--", "sh", "-c", command ]
 
 style :: forall m. MonadAff m => String -> String -> m String
-style foreground text = gum [ "style", "--foreground", foreground, text ]
+style = styleNative
+
+styleNative :: forall m. MonadAff m => String -> String -> m String
+styleNative foreground text = pure $ ansiForeground foreground text
+
+data Key
+  = KeyChar String
+  | KeyEnter
+  | KeyEscape
+  | KeyBackspace
+  | KeyUp
+  | KeyDown
+  | KeyLeft
+  | KeyRight
+  | KeyCtrlC
+  | KeyCtrlD
+  | KeyUnknown String
+
+type Prompt a =
+  { render :: Effect (Array String)
+  , handle :: Key -> Effect (Maybe a)
+  , cancel :: Effect Unit
+  , tick :: Boolean
+  , redrawFirstLineOnly :: Boolean
+  }
+
+runPrompt :: forall m a. MonadAff m => Aff (Prompt a) -> m a
+runPrompt build = do
+  withRawTerminal do
+    prompt <- build
+    waitForPrompt prompt
+  # liftAff
+
+withRawTerminal :: forall a. Aff a -> Aff a
+withRawTerminal action = Aff.bracket acquire release use
+  where
+  acquire = do
+    cmd_ "stty raw -echo < /dev/tty"
+    writeStderr hideCursorCode # liftEffect
+
+  release _ = do
+    writeStderr showCursorCode # liftEffect
+    cmd_ "stty sane < /dev/tty"
+
+  use _ = action
+
+waitForPrompt :: forall a. Prompt a -> Aff a
+waitForPrompt prompt = Aff.makeAff \finish -> do
+  renderedLines <- Ref.new 0
+  finished <- Ref.new false
+  removeRef <- Ref.new (pure unit :: Effect Unit)
+  repaint renderedLines prompt
+  Stream.setEncoding Process.stdin UTF8
+  repaintInterval <- if prompt.tick then Just <$> Timer.setInterval 530 (repaint renderedLines prompt)
+    else pure Nothing
+  remove <- Process.stdin # on Stream.dataHStr \chunk -> do
+    handleKeys finish renderedLines removeRef repaintInterval finished prompt $ decodeKeys chunk
+  Ref.write remove removeRef
+  Stream.resume Process.stdin
+  pure $ Aff.effectCanceler do
+    Ref.write true finished
+    join $ Ref.read removeRef
+    for_ repaintInterval Timer.clearInterval
+    clearPrompt renderedLines
+    prompt.cancel
+
+handleKeys :: forall a. (Either Exception.Error a -> Effect Unit) -> Ref.Ref Int -> Ref.Ref (Effect Unit) -> Maybe Timer.IntervalId -> Ref.Ref Boolean -> Prompt a -> Array Key -> Effect Unit
+handleKeys finish renderedLines removeRef repaintInterval finished prompt keys = do
+  done <- Ref.read finished
+  if done then pure unit
+  else case Array.uncons keys of
+    Nothing -> pure unit
+    Just { head: key, tail: rest } -> do
+      result <- prompt.handle key
+      case result of
+        Nothing -> do
+          repaint renderedLines prompt
+          handleKeys finish renderedLines removeRef repaintInterval finished prompt rest
+        Just value -> do
+          Ref.write true finished
+          join $ Ref.read removeRef
+          for_ repaintInterval Timer.clearInterval
+          clearPrompt renderedLines
+          prompt.cancel
+          finish $ Right value
+
+repaint :: forall a. Ref.Ref Int -> Prompt a -> Effect Unit
+repaint renderedLines prompt = do
+  count <- Ref.read renderedLines
+  lines <- prompt.render
+  if prompt.redrawFirstLineOnly && count == Array.length lines && count > 0 then do
+    case Array.head lines of
+      Just firstLine -> writeStderr $ redrawFirstLine count firstLine
+      Nothing -> pure unit
+  else do
+    writeStderr $ clearFrame count <> drawFrame lines
+    Ref.write (Array.length lines) renderedLines
+
+redrawFirstLine :: Int -> String -> String
+redrawFirstLine count line = "\x1b[" <> show count <> "A\x1b[2K\r" <> line <> "\x1b[" <> show count <> "B\r"
+
+clearPrompt :: Ref.Ref Int -> Effect Unit
+clearPrompt renderedLines = do
+  count <- Ref.read renderedLines
+  writeStderr $ clearFrame count
+  Ref.write 0 renderedLines
+
+clearFrame :: Int -> String
+clearFrame count
+  | count <= 0 = ""
+  | otherwise = "\x1b[1A" <> Array.foldMap clearLine (Array.range 0 (count - 1))
+  where
+  clearLine index = "\x1b[2K\r" <> if index < count - 1 then "\x1b[1A" else ""
+
+drawFrame :: Array String -> String
+drawFrame = Array.foldMap (_ <> "\r\n")
+
+writeStderr :: String -> Effect Unit
+writeStderr text = void $ Stream.writeString Process.stderr UTF8 text
+
+decodeKeys :: String -> Array Key
+decodeKeys chunk
+  | chunk == "" = []
+  | String.CodeUnits.take 3 chunk == "\x1b[A" = [ KeyUp ] <> decodeKeys (String.CodeUnits.drop 3 chunk)
+  | String.CodeUnits.take 3 chunk == "\x1b[B" = [ KeyDown ] <> decodeKeys (String.CodeUnits.drop 3 chunk)
+  | String.CodeUnits.take 3 chunk == "\x1b[C" = [ KeyRight ] <> decodeKeys (String.CodeUnits.drop 3 chunk)
+  | String.CodeUnits.take 3 chunk == "\x1b[D" = [ KeyLeft ] <> decodeKeys (String.CodeUnits.drop 3 chunk)
+  | otherwise = case String.CodeUnits.uncons chunk of
+      Nothing -> []
+      Just { head: char, tail: rest } -> [ decodeChar char ] <> decodeKeys rest
+
+decodeChar :: Char -> Key
+decodeChar char = case char of
+  '\x03' -> KeyCtrlC
+  '\x04' -> KeyCtrlD
+  '\x1b' -> KeyEscape
+  '\r' -> KeyEnter
+  '\n' -> KeyEnter
+  '\x7f' -> KeyBackspace
+  '\x08' -> KeyBackspace
+  _ -> KeyChar $ String.CodeUnits.singleton char
+
+choosePrompt :: Array String -> Aff (Prompt String)
+choosePrompt choices = do
+  selected <- Ref.new 0 # liftEffect
+  pure
+    { render: renderChoose selected
+    , handle: handleChoose selected
+    , cancel: pure unit
+    , tick: false
+    , redrawFirstLineOnly: false
+    }
+  where
+  height = 10
+
+  renderChoose selected = do
+    index <- Ref.read selected
+    pure $
+      [ purple "Choose:" ]
+        <> choiceLines index
+        <> [ "", muted "←↓↑→ navigate • enter submit" ]
+
+  handleChoose selected key = do
+    case chooseKeyAction key of
+      "cancel" -> throwPrompt "nothing selected"
+      "submit" -> do
+        index <- Ref.read selected
+        pure $ Array.index choices index
+      "up" -> moveSelected selected (-1)
+      "down" -> moveSelected selected 1
+      "left" -> moveSelected selected (-height)
+      "right" -> moveSelected selected height
+      "home" -> Ref.write 0 selected *> pure Nothing
+      "end" -> Ref.write (Array.length choices - 1) selected *> pure Nothing
+      _ -> pure Nothing
+
+  choiceLines index = do
+    let page = Int.quot index height
+    let start = page * height
+    choices
+      # Array.drop start
+      # Array.take height
+      # Array.mapWithIndex \offset choice -> do
+          let actual = start + offset
+          if actual == index then pink "> " <> pink choice
+          else "  " <> choice
+
+  moveSelected selected delta = do
+    index <- Ref.read selected
+    let count = Array.length choices
+    let next = mod (index + delta + count) count
+    Ref.write next selected
+    pure Nothing
+
+confirmPrompt :: String -> Aff (Prompt Boolean)
+confirmPrompt message = do
+  yes <- Ref.new true # liftEffect
+  pure
+    { render: renderConfirm yes
+    , handle: handleConfirm yes
+    , cancel: pure unit
+    , tick: false
+    , redrawFirstLineOnly: false
+    }
+  where
+  renderConfirm yes = do
+    selected <- Ref.read yes
+    pure
+      [ bold $ purple $ " " <> message
+      , (if selected then selectedButton "Yes" else unselectedButton "Yes") <> " " <> (if selected then unselectedButton "No" else selectedButton "No")
+      , ""
+      , muted "←→ toggle • enter submit • y Yes • n No"
+      ]
+
+  handleConfirm yes key = case confirmKeyAction key of
+    "yes" -> pure $ Just true
+    "no" -> pure $ Just false
+    "submit" -> Just <$> Ref.read yes
+    "toggle" -> Ref.modify_ not yes *> pure Nothing
+    _ -> pure Nothing
+
+inputPrompt :: String -> Aff (Prompt String)
+inputPrompt placeholder = do
+  value <- Ref.new "" # liftEffect
+  cursorVisible <- Ref.new true # liftEffect
+  interval <- Timer.setInterval 530 (Ref.modify_ not cursorVisible) # liftEffect
+  pure
+    { render: renderInput value cursorVisible
+    , handle: handleInput value cursorVisible
+    , cancel: Timer.clearInterval interval
+    , tick: true
+    , redrawFirstLineOnly: true
+    }
+  where
+  renderInput value cursorVisible = do
+    current <- Ref.read value
+    visible <- Ref.read cursorVisible
+    pure [ "> " <> inputView visible current, "", muted "enter submit" ]
+
+  handleInput value cursorVisible key = do
+    Ref.write true cursorVisible
+    case textAction key of
+      "cancel" -> throwPrompt "not submitted"
+      "submit" -> Just <$> Ref.read value
+      "backspace" -> Ref.modify_ dropLast value *> pure Nothing
+      "ignore" -> pure Nothing
+      inserted -> Ref.modify_ (_ <> inserted) value *> pure Nothing
+
+  inputView visible current
+    | current == "" = placeholderView visible
+    | otherwise = current <> cursorCell " "
+
+  placeholderView visible
+    | placeholder == "" = if visible then cursorCell " " else " "
+    | visible = selectedPlaceholder placeholder
+    | otherwise = muted placeholder
+
+writePrompt :: String -> Aff (Prompt String)
+writePrompt placeholder = do
+  linesRef <- Ref.new ([] :: Array String) # liftEffect
+  currentRef <- Ref.new "" # liftEffect
+  pure
+    { render: renderWrite linesRef currentRef
+    , handle: handleWrite linesRef currentRef
+    , cancel: pure unit
+    , tick: false
+    , redrawFirstLineOnly: false
+    }
+  where
+  renderWrite linesRef currentRef = do
+    lines <- Ref.read linesRef
+    current <- Ref.read currentRef
+    let visible = Array.drop (max 0 (Array.length lines - 8)) lines
+    pure $
+      [ purple "Write:" ]
+        <> (visible <#> ("  " <> _))
+        <> [ "> " <> writeCurrent current, "", muted "enter newline • ctrl+d submit • esc cancel" ]
+
+  handleWrite linesRef currentRef = case _ of
+    KeyCtrlC -> throwPrompt "not submitted"
+    KeyEscape -> throwPrompt "not submitted"
+    KeyCtrlD -> do
+      lines <- Ref.read linesRef
+      current <- Ref.read currentRef
+      pure $ Just $ String.joinWith "\n" $ lines <> [ current ]
+    KeyEnter -> do
+      current <- Ref.read currentRef
+      Ref.modify_ (_ <> [ current ]) linesRef
+      Ref.write "" currentRef
+      pure Nothing
+    KeyBackspace -> Ref.modify_ dropLast currentRef *> pure Nothing
+    KeyChar inserted -> Ref.modify_ (_ <> inserted) currentRef *> pure Nothing
+    _ -> pure Nothing
+
+  writeCurrent current
+    | current == "" = muted placeholder <> cursorCell " "
+    | otherwise = current <> cursorCell " "
+
+filterPrompt :: Array String -> Aff (Prompt String)
+filterPrompt choices = do
+  queryRef <- Ref.new "" # liftEffect
+  selected <- Ref.new 0 # liftEffect
+  focused <- Ref.new true # liftEffect
+  height <- filterViewportHeight
+  pure
+    { render: renderFilter height queryRef selected focused
+    , handle: handleFilter queryRef selected focused
+    , cancel: pure unit
+    , tick: false
+    , redrawFirstLineOnly: false
+    }
+  where
+  renderFilter height queryRef selected focused = do
+    query <- Ref.read queryRef
+    index <- Ref.read selected
+    isFocused <- Ref.read focused
+    let matched = matches query
+    if index >= Array.length matched then Ref.write (max 0 (Array.length matched - 1)) selected
+    else pure unit
+    pure $
+      [ "> " <> if query == "" then muted "Filter..." else query ]
+        <> filterLines height query index matched
+        <> [ "", filterHelp isFocused ]
+
+  handleFilter queryRef selected focused key = do
+    isFocused <- Ref.read focused
+    if isFocused then handleFocused queryRef selected focused key
+    else handleBlurred queryRef selected focused key
+
+  handleFocused queryRef selected focused key = do
+    action <- pure $ textAction key
+    case action of
+      "cancel" -> Ref.write false focused *> pure Nothing
+      "submit" -> submitFilter queryRef selected
+      "up" -> cursorUp selected *> pure Nothing
+      "down" -> cursorDown queryRef selected *> pure Nothing
+      "backspace" -> Ref.modify_ dropLast queryRef *> Ref.write 0 selected *> pure Nothing
+      "ignore" -> pure Nothing
+      inserted -> Ref.modify_ (_ <> inserted) queryRef *> Ref.write 0 selected *> pure Nothing
+
+  handleBlurred queryRef selected focused key = do
+    case filterNavigationAction key of
+      "cancel" -> throwPrompt "nothing selected"
+      "focus" -> Ref.write true focused *> pure Nothing
+      "submit" -> submitFilter queryRef selected
+      "up" -> cursorUp selected *> pure Nothing
+      "down" -> cursorDown queryRef selected *> pure Nothing
+      "home" -> Ref.write 0 selected *> pure Nothing
+      "end" -> do
+        query <- Ref.read queryRef
+        Ref.write (Array.length (matches query) - 1) selected
+        pure Nothing
+      _ -> pure Nothing
+
+  submitFilter queryRef selected = do
+    query <- Ref.read queryRef
+    index <- Ref.read selected
+    pure $ Array.index (matches query) index
+
+  cursorUp selected = Ref.modify_ (max 0 <<< (_ - 1)) selected
+
+  cursorDown queryRef selected = do
+    query <- Ref.read queryRef
+    Ref.modify_ (min (Array.length (matches query) - 1) <<< (_ + 1)) selected
+
+  filterLines height query index matched = case Array.take height matched of
+    [] -> [ "  " <> muted "No matches" ]
+    visible -> visible # Array.mapWithIndex \offset choice ->
+      if offset == index then pink "•" <> " " <> highlightMatch query choice
+      else "  " <> highlightMatch query choice
+
+  filterHelp focused
+    | focused = muted "↓↑ navigate • esc blur search • enter submit"
+    | otherwise = muted "↓↑ navigate • / search • esc quit • enter submit"
+
+  matches query = choices # Array.filter (fuzzyMatch query)
+
+withSpinner :: forall m. MonadAff m => String -> String -> m String
+withSpinner title command = do
+  liftAff do
+    resultRef <- Ref.new Nothing # liftEffect
+    _ <- Aff.forkAff do
+      result <- Aff.try $ cmd command
+      Ref.write (Just result) resultRef # liftEffect
+    spinUntilDone title 0 resultRef
+
+spinUntilDone :: String -> Int -> Ref.Ref (Maybe (Either Exception.Error String)) -> Aff String
+spinUntilDone title index resultRef = do
+  result <- Ref.read resultRef # liftEffect
+  case result of
+    Nothing -> do
+      writeStderr ("\r\x1b[2K" <> pink (spinnerFrame index) <> " " <> title) # liftEffect
+      Aff.delay $ Milliseconds 80.0
+      spinUntilDone title (index + 1) resultRef
+    Just (Left err) -> do
+      writeStderr ("\r\x1b[2K✗ " <> title <> "\n") # liftEffect
+      Aff.throwError err
+    Just (Right value) -> do
+      writeStderr ("\r\x1b[2K" <> pink "✓" <> " " <> title <> "\n") # liftEffect
+      pure value
+
+splitLines :: String -> Array String
+splitLines text = String.split (Pattern "\n") (String.trim text) # Array.filter (_ /= "")
+
+shellQuote :: String -> String
+shellQuote text = "'" <> Regex.replace (unsafeRegex "'" noFlags) "'\\''" text <> "'"
+
+toCsv :: Array (Array String) -> String
+toCsv rows = String.joinWith "\n" $ rows <#> String.joinWith ","
+
+renderTable :: Array (Array String) -> String
+renderTable rows = do
+  let widths = columnWidths rows
+  rows
+    <#> renderTableRow widths
+    # String.joinWith "\n"
+
+renderTableRow :: Array Int -> Array String -> String
+renderTableRow widths row = do
+  let padded = row # Array.mapWithIndex \index cell -> padRight (maybe 0 identity $ Array.index widths index) cell
+  String.joinWith "  " padded
+
+columnWidths :: Array (Array String) -> Array Int
+columnWidths rows = do
+  let count = Array.foldl max 0 $ rows <#> Array.length
+  Array.range 0 (count - 1) <#> \index -> do
+    let cells = rows <#> \row -> maybe "" identity $ Array.index row index
+    Array.foldl (\longest cell -> max longest $ String.CodeUnits.length cell) 0 cells
+
+renderMarkdown :: String -> String
+renderMarkdown text = do
+  let lines = String.split (Pattern "\n") text <#> renderMarkdownLine
+  String.joinWith "\n" lines
+
+renderMarkdownLine :: String -> String
+renderMarkdownLine line
+  | String.CodeUnits.take 2 line == "# " = bold $ purple $ String.CodeUnits.drop 2 line
+  | String.CodeUnits.take 3 line == "## " = bold $ pink $ String.CodeUnits.drop 3 line
+  | String.CodeUnits.take 2 line == "- " = pink "• " <> String.CodeUnits.drop 2 line
+  | otherwise = line
+
+padRight :: Int -> String -> String
+padRight width text = text <> String.CodeUnits.fromCharArray (Array.replicate (max 0 $ width - String.CodeUnits.length text) ' ')
+
+filterViewportHeight :: Aff Int
+filterViewportHeight = do
+  rows <- cmd "stty size < /dev/tty | awk '{ print $1 }'"
+  pure case Int.fromString (String.trim rows) of
+    Just count -> max 1 (count - 5)
+    Nothing -> 10
+
+spinnerFrame :: Int -> String
+spinnerFrame index = case Array.index [ "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" ] (mod index 10) of
+  Just frame -> frame
+  Nothing -> "⠋"
+
+chooseKeyAction :: Key -> String
+chooseKeyAction = case _ of
+  KeyCtrlC -> "cancel"
+  KeyEscape -> "cancel"
+  KeyEnter -> "submit"
+  KeyUp -> "up"
+  KeyDown -> "down"
+  KeyLeft -> "left"
+  KeyRight -> "right"
+  KeyChar "k" -> "up"
+  KeyChar "j" -> "down"
+  KeyChar "h" -> "left"
+  KeyChar "l" -> "right"
+  KeyChar "g" -> "home"
+  KeyChar "G" -> "end"
+  _ -> "ignore"
+
+confirmKeyAction :: Key -> String
+confirmKeyAction = case _ of
+  KeyCtrlC -> "no"
+  KeyEscape -> "no"
+  KeyEnter -> "submit"
+  KeyLeft -> "toggle"
+  KeyRight -> "toggle"
+  KeyChar "h" -> "toggle"
+  KeyChar "l" -> "toggle"
+  KeyChar "y" -> "yes"
+  KeyChar "Y" -> "yes"
+  KeyChar "n" -> "no"
+  KeyChar "N" -> "no"
+  KeyChar "q" -> "no"
+  _ -> "ignore"
+
+textAction :: Key -> String
+textAction = case _ of
+  KeyCtrlC -> "cancel"
+  KeyEscape -> "cancel"
+  KeyEnter -> "submit"
+  KeyBackspace -> "backspace"
+  KeyUp -> "up"
+  KeyDown -> "down"
+  KeyChar char -> char
+  _ -> "ignore"
+
+filterNavigationAction :: Key -> String
+filterNavigationAction = case _ of
+  KeyCtrlC -> "cancel"
+  KeyEscape -> "cancel"
+  KeyEnter -> "submit"
+  KeyUp -> "up"
+  KeyDown -> "down"
+  KeyChar "k" -> "up"
+  KeyChar "j" -> "down"
+  KeyChar "g" -> "home"
+  KeyChar "G" -> "end"
+  KeyChar "/" -> "focus"
+  _ -> "ignore"
+
+fuzzyMatch :: String -> String -> Boolean
+fuzzyMatch query value = fuzzyMatchFrom (String.CodeUnits.toCharArray $ String.toLower query) (String.CodeUnits.toCharArray $ String.toLower value)
+
+fuzzyMatchFrom :: Array Char -> Array Char -> Boolean
+fuzzyMatchFrom query value = case Array.uncons query of
+  Nothing -> true
+  Just { head: wanted, tail: rest } -> case Array.findIndex (_ == wanted) value of
+    Nothing -> false
+    Just index -> fuzzyMatchFrom rest $ Array.drop (index + 1) value
+
+highlightMatch :: String -> String -> String
+highlightMatch query value = highlightMatchFrom (String.CodeUnits.toCharArray $ String.toLower query) (String.CodeUnits.toCharArray value)
+
+highlightMatchFrom :: Array Char -> Array Char -> String
+highlightMatchFrom query value = case Array.uncons value of
+  Nothing -> ""
+  Just { head: char, tail: rest } -> case Array.uncons query of
+    Nothing -> String.CodeUnits.singleton char <> charsToString rest
+    Just { head: wanted, tail: remaining } ->
+      if String.toLower (String.CodeUnits.singleton char) == String.CodeUnits.singleton wanted then pink (String.CodeUnits.singleton char) <> highlightMatchFrom remaining rest
+      else String.CodeUnits.singleton char <> highlightMatchFrom query rest
+
+charsToString :: Array Char -> String
+charsToString = Array.foldMap String.CodeUnits.singleton
+
+dropLast :: String -> String
+dropLast text = String.CodeUnits.take (String.CodeUnits.length text - 1) text
+
+selectedPlaceholder :: String -> String
+selectedPlaceholder text = do
+  let first = String.CodeUnits.take 1 text
+  let rest = String.CodeUnits.drop 1 text
+  placeholderCursorCell first <> muted rest
+
+cursorCell :: String -> String
+cursorCell text = bg "212" $ cream text
+
+placeholderCursorCell :: String -> String
+placeholderCursorCell text = bg "212" $ muted text
+
+throwPrompt :: forall a. String -> Effect (Maybe a)
+throwPrompt message = Exception.throw message
+
+ansiForeground :: String -> String -> String
+ansiForeground foreground text = "\x1b[38;5;" <> foreground <> "m" <> text <> "\x1b[0m"
+
+ansi :: String -> String -> String
+ansi code text = "\x1b[" <> code <> "m" <> text <> "\x1b[0m"
+
+fg :: String -> String -> String
+fg color = ansi $ "38;5;" <> color
+
+bg :: String -> String -> String
+bg color = ansi $ "48;5;" <> color
+
+pink :: String -> String
+pink = fg "212"
+
+purple :: String -> String
+purple = fg "99"
+
+muted :: String -> String
+muted = fg "240"
+
+cream :: String -> String
+cream = fg "230"
+
+bold :: String -> String
+bold = ansi "1"
+
+selectedButton :: String -> String
+selectedButton text = bg "212" $ cream $ "   " <> text <> "   "
+
+unselectedButton :: String -> String
+unselectedButton text = bg "235" $ fg "254" $ "   " <> text <> "   "
+
+hideCursorCode :: String
+hideCursorCode = "\x1b[?25l"
+
+showCursorCode :: String
+showCursorCode = "\x1b[?25h"
 
 gumBin :: String
 gumBin = "gum"
+
+interactive :: ExecaOptions -> ExecaOptions
+interactive options = options
+  { stdin = Just inherit
+  , stderr = Just inherit
+  }
 
 stream :: ExecaOptions -> ExecaOptions
 stream options = options
@@ -1207,9 +1894,18 @@ pipe stdin command = do
   shell = "sh"
 
 exec :: forall m. MonadAff m => String -> Array String -> m CommandResult
-exec command commandArgs = fromEffectFnAff (execImpl command commandArgs) # liftAff
-
-foreign import execImpl :: String -> Array String -> EffectFnAff CommandResult
+exec command commandArgs = do
+  spawned <- spawnWith command commandArgs (_ { stripFinalNewline = Just false })
+  result <- spawned.getResult # liftAff
+  pure
+    { code: exitCode result.exit
+    , stdout: result.stdout
+    , stderr: result.stderr
+    }
+  where
+  exitCode = case _ of
+    Normally code -> code
+    BySignal _ -> 1
 
 sh :: forall m. MonadAff m => String -> m String
 sh command = do

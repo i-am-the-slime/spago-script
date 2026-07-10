@@ -77,6 +77,15 @@ main = runSpecAndExitProcess [ consoleReporter ] do
       listedWithTemplate `shouldEqual` "cwd.txt\npipe.txt\nprelude.txt"
       piped `shouldEqual` "two"
       pipedBackwards `shouldEqual` "one"
+    it "renders gum-style pure helpers" do
+      joined <- joinText [ "alpha", "beta" ]
+      horizontal <- joinTextHorizontal [ "alpha", "beta" ]
+      renderedTable <- table [ [ "name", "kind" ], [ "demo", "app" ] ]
+      formatted <- markdown "# Title\n- item"
+      joined `shouldEqual` "alpha\nbeta"
+      horizontal `shouldEqual` "alpha beta"
+      renderedTable `shouldEqual` "name  kind\ndemo  app "
+      formatted `shouldEqual` "\x1b[1m\x1b[38;5;99mTitle\x1b[0m\x1b[0m\n\x1b[38;5;212m• \x1b[0mitem"
     it "runs typed command templates" do
       mkdir @"-p $dir" { dir: testDirectory / "commands" }
       write (testDirectory / "commands" / "a.txt") "commands"

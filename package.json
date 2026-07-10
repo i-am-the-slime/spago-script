@@ -2,7 +2,22 @@
   "name": "spago-script-prelude",
   "version": "0.1.0",
   "type": "module",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/i-am-the-slime/spago-script.git"
+  },
   "bin": {
     "spago-script": "bin/spago-script.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "spago.yaml",
+    "spago.lock"
+  ],
+  "scripts": {
+    "test": "spago test",
+    "pty:test": "test/pty/run"
   }
 }

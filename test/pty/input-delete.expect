@@ -1,0 +1,7 @@
+#!/usr/bin/env expect
+set timeout 60
+set script [lindex $argv 0]
+spawn /Users/mark/code/spago-script/bin/spago-script.js $script
+expect -re {project name}
+send "abcdef\177\177\177XYZ\r"
+expect -re {VALUE=abcXYZ}
