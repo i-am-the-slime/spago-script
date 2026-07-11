@@ -1,8 +1,9 @@
 {
-  "name": "spago-script-prelude",
+  "name": "spago-script",
   "version": "0.1.0",
   "type": "module",
   "private": false,
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/i-am-the-slime/spago-script.git"
