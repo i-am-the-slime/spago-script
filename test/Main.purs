@@ -77,6 +77,15 @@ main = runSpecAndExitProcess [ consoleReporter ] do
       listedWithTemplate `shouldEqual` "cwd.txt\npipe.txt\nprelude.txt"
       piped `shouldEqual` "two"
       pipedBackwards `shouldEqual` "one"
+    it "reads and writes JSON from yoga-json" do
+      let encoded = writeJSON { name: "scripts", count: 2 }
+      let decoded = readJSON_ @{ name :: String, count :: Int } encoded
+      decoded `shouldEqual` Just { name: "scripts", count: 2 }
+    it "parses and renders cookie headers" do
+      cookieHeader [ cookie "sid" "abc", cookie "theme" "dark" ] `shouldEqual` "sid=abc; theme=dark"
+      parseCookieHeader "sid=abc; theme=dark" `shouldEqual` [ cookie "sid" "abc", cookie "theme" "dark" ]
+      setCookieHeader (setCookie "sid" "abc" [ { name: "HttpOnly", value: Nothing }, { name: "Path", value: Just "/" } ]) `shouldEqual` "sid=abc; HttpOnly; Path=/"
+      parseSetCookieHeader "sid=abc; HttpOnly; Path=/" `shouldEqual` setCookie "sid" "abc" [ { name: "HttpOnly", value: Nothing }, { name: "Path", value: Just "/" } ]
     it "renders gum-style pure helpers" do
       joined <- joinText [ "alpha", "beta" ]
       horizontal <- joinTextHorizontal [ "alpha", "beta" ]

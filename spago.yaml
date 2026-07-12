@@ -6,21 +6,27 @@ package:
     - console
     - effect
     - exceptions
+    - fetch-yoga-json
     - foldable-traversable
+    - http-methods
+    - js-timers
     - maybe
     - node-buffer
+    - node-event-emitter
     - node-execa
     - node-fs
     - node-path
     - node-process
     - node-streams
-    - node-event-emitter
-    - refs
-    - js-timers
     - nullable
     - prelude
+    - refs
     - strings
+    - yoga-fetch
+    - yoga-fetch-om
     - yoga-format
+    - yoga-http-api
+    - yoga-json
     - yoga-om
   test:
     main: Test.Main
