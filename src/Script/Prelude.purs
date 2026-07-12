@@ -305,7 +305,7 @@ import Yoga.Format (fmt, format) as Yoga.Format
 import Yoga.Format.Render (class RenderInput)
 import Yoga.JSON hiding (read, write) as Yoga.JSON
 import Yoga.Om (Om)
-import Yoga.Om (Om(..), ParOm(..), delay, error, expand, expandCtx, expandErr, fatal, fromAff, handleErrors, handleErrors', inParallel, launchOm, launchOm_, mapError, note, noteM, onError, parOmToAff, race, readerT, runOm, runOmOrThrow, runOmRecord, runOms, runOmsInOm, runReader, sequenceOmRecord, tap, tapM, throw, throwLeftAs, throwLeftAsM, toOm, unliftAff, unliftAffFn, widenCtx) as Yoga.Om
+import Yoga.Om (Om(..), ParOm(..), delay, error, expand, expandCtx, expandErr, fatal, fromAff, handleErrors, handleErrors', inParallel, launchOm, launchOm_, mapError, note, noteM, onError, parOmToAff, race, readerT, runOm, runOmRecord, runOms, runOmsInOm, runReader, sequenceOmRecord, tap, tapM, throw, throwLeftAs, throwLeftAsM, toOm, unliftAff, unliftAffFn, widenCtx) as Yoga.Om
 
 type Cookie =
   { name :: String
@@ -785,7 +785,7 @@ runAff :: forall a. Om {} () a -> Aff a
 runAff = runAffWith {}
 
 runAffWith :: forall ctx a. ctx -> Om ctx () a -> Aff a
-runAffWith = Yoga.Om.runOmOrThrow
+runAffWith context script = Yoga.Om.runOm context { exception: Aff.throwError } script
 
 go :: Om {} () Unit -> Effect Unit
 go = run
