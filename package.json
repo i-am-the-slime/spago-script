@@ -11,6 +11,10 @@
   "bin": {
     "spago-script": "bin/spago-script.js"
   },
+  "dependencies": {
+    "purescript": "^0.15.16",
+    "spago": "^1.0.4"
+  },
   "files": [
     "bin",
     "src",
