@@ -30,50 +30,61 @@ Scripts without a module header are wrapped as:
   process.exit(script ? 0 : 1);
 }
 
-ensureCache();
-
-const scriptPath = path.resolve(process.cwd(), script);
-const source = stripShebang(fs.readFileSync(scriptPath, "utf8"));
-const parsedModule = source.match(/^\s*module\s+([A-Z][\w]*(?:\.[A-Z][\w]*)*)\s+where\b/m);
-const mainModule = parsedModule ? parsedModule[1] : "Main";
-const wrappedSource = parsedModule ? source : wrapScript(source);
-
-const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "spago-script-"));
-const scriptModulePath = path.join(workdir, "src", `${mainModule.replaceAll(".", path.sep)}.purs`);
-
-copySkeleton(workdir);
-fs.mkdirSync(path.dirname(scriptModulePath), { recursive: true });
-fs.writeFileSync(scriptModulePath, wrappedSource);
-
-const build = spawnSync("spago", [
-  "build",
-  "--offline",
-  "--quiet",
-  "--censor-stats"
-], {
-  cwd: workdir,
-  env: process.env,
-  encoding: "utf8",
-  stdio: "pipe"
-});
-
-if (build.status !== 0) {
-  process.stdout.write(build.stdout ?? "");
-  process.stderr.write(build.stderr ?? "");
-  process.exit(build.status ?? 1);
+try {
+  ensureCache();
+  process.exitCode = runScript();
+} catch (error) {
+  if (error.reported) process.exitCode = error.exitCode;
+  else throw error;
 }
 
-const runnerPath = path.join(workdir, "run.js");
-const mainPath = path.join(workdir, "output", mainModule, "index.js");
-fs.writeFileSync(runnerPath, `import { main } from ${JSON.stringify(pathToFileURL(mainPath).href)};\nmain();\n`);
+function runScript() {
+  const scriptPath = path.resolve(process.cwd(), script);
+  const source = stripShebang(fs.readFileSync(scriptPath, "utf8"));
+  const parsedModule = source.match(/^\s*module\s+([A-Z][\w]*(?:\.[A-Z][\w]*)*)\s+where\b/m);
+  const mainModule = parsedModule ? parsedModule[1] : "Main";
+  const wrappedSource = parsedModule ? source : wrapScript(source);
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "spago-script-"));
 
-const result = spawnSync("bun", [ runnerPath, ...scriptArgs ], {
-  cwd: process.cwd(),
-  env: process.env,
-  stdio: "inherit"
-});
+  try {
+    const scriptModulePath = path.join(workdir, "src", `${mainModule.replaceAll(".", path.sep)}.purs`);
+    copySkeleton(workdir, mainModule);
+    fs.mkdirSync(path.dirname(scriptModulePath), { recursive: true });
+    fs.writeFileSync(scriptModulePath, wrappedSource);
 
-process.exit(result.status ?? 1);
+    const build = spawnSync("spago", [
+      "build",
+      "--offline",
+      "--quiet",
+      "--censor-stats"
+    ], {
+      cwd: workdir,
+      env: process.env,
+      encoding: "utf8",
+      stdio: "pipe"
+    });
+
+    if (build.status !== 0) {
+      process.stdout.write(build.stdout ?? "");
+      process.stderr.write(build.stderr ?? "");
+      return build.status ?? 1;
+    }
+
+    const runnerPath = path.join(workdir, "run.js");
+    const mainPath = path.join(workdir, "output", mainModule, "index.js");
+    fs.writeFileSync(runnerPath, `import { main } from ${JSON.stringify(pathToFileURL(mainPath).href)};\nmain();\n`);
+
+    const result = spawnSync("bun", [ runnerPath, ...scriptArgs ], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: "inherit"
+    });
+
+    return result.status ?? 1;
+  } finally {
+    fs.rmSync(workdir, { force: true, recursive: true });
+  }
+}
 
 function stripShebang(source) {
   return source.startsWith("#!") ? source.replace(/^.*(?:\r?\n|$)/, "") : source;
@@ -89,18 +100,68 @@ function ensureCache() {
   const expectedStamp = cacheStamp();
   if (cacheIsFresh(stamp, expectedStamp)) return;
 
-  fs.rmSync(cacheDir, { force: true, recursive: true });
-  fs.mkdirSync(cacheDir, { recursive: true });
-  copyProjectFiles(cacheDir);
-  run("spago", cacheBuildArgs(), { cwd: cacheDir });
-  fs.writeFileSync(stamp, expectedStamp);
+  fs.mkdirSync(cacheRoot, { recursive: true });
+  const lock = `${cacheDir}.lock`;
+  acquireCacheLock(lock);
+
+  try {
+    if (cacheIsFresh(stamp, expectedStamp)) return;
+    fs.rmSync(cacheDir, { force: true, recursive: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    copyProjectFiles(cacheDir);
+    run("spago", cacheBuildArgs(), { cwd: cacheDir });
+    fs.writeFileSync(stamp, expectedStamp);
+  } finally {
+    fs.rmSync(lock, { force: true, recursive: true });
+  }
 }
 
-function copySkeleton(workdir) {
+function acquireCacheLock(lock) {
+  while (true) {
+    try {
+      fs.mkdirSync(lock);
+      fs.writeFileSync(path.join(lock, "owner"), String(process.pid));
+      return;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      if (!cacheLockOwnerIsRunning(lock)) {
+        fs.rmSync(lock, { force: true, recursive: true });
+        continue;
+      }
+      Bun.sleepSync(25);
+    }
+  }
+}
+
+function cacheLockOwnerIsRunning(lock) {
+  try {
+    const owner = Number(fs.readFileSync(path.join(lock, "owner"), "utf8"));
+    process.kill(owner, 0);
+    return true;
+  } catch (error) {
+    return error.code !== "ESRCH";
+  }
+}
+
+function copySkeleton(workdir, mainModule) {
   ensureCache();
   copyProjectFiles(workdir);
   linkPackages(workdir);
-  fs.symlinkSync(path.join(cacheDir, "output"), path.join(workdir, "output"), "dir");
+  linkCachedOutput(workdir, mainModule);
+}
+
+function linkCachedOutput(workdir, mainModule) {
+  const cachedOutput = path.join(cacheDir, "output");
+  const output = path.join(workdir, "output");
+  fs.mkdirSync(output);
+
+  for (const entry of fs.readdirSync(cachedOutput, { withFileTypes: true })) {
+    const from = path.join(cachedOutput, entry.name);
+    const to = path.join(output, entry.name);
+    if (entry.name === mainModule) continue;
+    if (entry.isDirectory()) fs.symlinkSync(from, to, "dir");
+    else fs.copyFileSync(from, to);
+  }
 }
 
 function cacheIsFresh(stamp, expectedStamp) {
@@ -113,9 +174,7 @@ function cacheIsFresh(stamp, expectedStamp) {
 function copyProjectFiles(directory) {
   fs.copyFileSync(path.join(root, "spago.yaml"), path.join(directory, "spago.yaml"));
   fs.copyFileSync(path.join(root, "spago.lock"), path.join(directory, "spago.lock"));
-  fs.mkdirSync(path.join(directory, "src", "Script"), { recursive: true });
-  fs.copyFileSync(path.join(root, "src", "Script", "Prelude.purs"), path.join(directory, "src", "Script", "Prelude.purs"));
-  copyIfExists(path.join(root, "src", "Script", "Prelude.js"), path.join(directory, "src", "Script", "Prelude.js"));
+  fs.cpSync(path.join(root, "src"), path.join(directory, "src"), { recursive: true });
 }
 
 function linkPackages(directory) {
@@ -143,17 +202,20 @@ function cacheStamp() {
   return [
     fs.readFileSync(path.join(root, "spago.yaml"), "utf8"),
     fs.readFileSync(path.join(root, "spago.lock"), "utf8"),
-    fs.readFileSync(path.join(root, "src", "Script", "Prelude.purs"), "utf8"),
-    readIfExists(path.join(root, "src", "Script", "Prelude.js"))
+    directoryStamp(path.join(root, "src"))
   ].join("\n--- spago-script cache boundary ---\n");
 }
 
-function copyIfExists(from, to) {
-  if (fs.existsSync(from)) fs.copyFileSync(from, to);
-}
-
-function readIfExists(file) {
-  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+function directoryStamp(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((entry) => {
+      const file = path.join(directory, entry.name);
+      return entry.isDirectory()
+        ? directoryStamp(file)
+        : `${path.relative(root, file)}\n${fs.readFileSync(file, "utf8")}`;
+    })
+    .join("\n");
 }
 
 function run(command, args, options = {}) {
@@ -167,7 +229,10 @@ function run(command, args, options = {}) {
   if (result.status !== 0) {
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
-    process.exit(result.status ?? 1);
+    const error = new Error(`${command} exited unsuccessfully`);
+    error.exitCode = result.status ?? 1;
+    error.reported = true;
+    throw error;
   }
 
   return result;

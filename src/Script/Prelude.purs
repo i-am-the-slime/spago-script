@@ -17,40 +17,12 @@ module Script.Prelude
   , module Yoga.JSON
   , module Yoga.Format
   , module Yoga.Om
-  , class CmdArgs
-  , class KnownArgs
-  , class KnownTemplateArgs
-  , class LsArgs
-  , class RmArgs
+  , module Script.Prelude.Cookie
+  , module Script.Command.Grammar
+  , module Script.Command.Grammars
+  , module Script.Command.Typed
   , class ToArgs
-  , class ValidateLsArgs
-  , class ValidateLsPlainToken
-  , class ValidateLsPlainTokenChar
-  , class ValidateLsToken
-  , class ValidateLsFlag
-  , class ValidateLsFlagToken
-  , class ValidateRmArgs
-  , class ValidateRmFlag
-  , class ValidateRmFlagToken
-  , class ValidateRmPlainToken
-  , class ValidateRmPlainTokenChar
-  , class ValidateCommandArgs
-  , class ValidateCommandFlag
-  , class ValidateCommandFlagToken
-  , class ValidateCommandPlainToken
-  , class ValidateCommandPlainTokenChar
-  , class ValidateCommandToken
-  , class ValidateRmToken
-  , cmdKnownArgs
-  , knownArgs
-  , lsKnownArgs
-  , rmKnownArgs
-  , templateArgs
   , toArgs
-  , Cookie
-  , CookieAttribute
-  , SetCookie
-  , ResponseHeaders
   , CommandResult
   , ExecaOptions
   , ExecaProcess
@@ -62,14 +34,12 @@ module Script.Prelude
   , appendTextFileWith
   , args
   , cat
+  , cat_
+  , catArgs
   , cmd
   , cmd_
   , cmdHere
   , cmdPipe
-  , cookie
-  , cookieHeader
-  , cookiesFromHeaders
-  , cookiesFromResponseHeaders
   , cmdWith
   , copy
   , copyFile
@@ -162,12 +132,12 @@ module Script.Prelude
   , pager
   , pagerNative
   , pathJoin
+  , class PipeTarget
+  , pipeTarget
   , pipeFrom
   , pipeInto
   , read
   , readFile
-  , parseCookieHeader
-  , parseSetCookieHeader
   , readlink
   , rename
   , readTextFile
@@ -190,8 +160,6 @@ module Script.Prelude
   , sed
   , sed_
   , sedArgs
-  , setCookie
-  , setCookieHeader
   , sh
   , sort
   , sort_
@@ -258,13 +226,10 @@ import Data.Int as Int
 import Data.String as String
 import Data.String.CodeUnits as String.CodeUnits
 import Data.String.Pattern (Pattern(..))
-import Data.Tuple.Nested (type (/\), (/\))
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Symbol (class IsSymbol, reflectSymbol)
-import Prim.Symbol as Symbol
-import Prim.TypeError (class Fail, Text, Beside)
+import Data.Symbol (class IsSymbol)
 import Effect (Effect)
 import Effect.Aff (Aff, Milliseconds(..))
 import Effect.Aff as Aff
@@ -274,7 +239,6 @@ import Effect.Class.Console as Console
 import Effect.Exception as Exception
 import Effect.Ref as Ref
 import Effect.Timer as Timer
-import Foreign.Object as Object
 import Fetch.Yoga.Json (fromJSON) as Fetch.Yoga.Json
 import Node.Buffer (Buffer)
 import Node.Buffer (Buffer) as Node.Buffer
@@ -296,9 +260,109 @@ import Node.Path as Path
 import Node.Process as Process
 import Node.Stream as Stream
 import Node.EventEmitter (on)
-import Type.Proxy (Proxy(..))
-import JS.Fetch.Headers as Fetch.Headers
-import Yoga.Fetch (URL(..), Fetch, Response, Options, Method, Headers, Redirect, Credentials, arrayBuffer, defaultFetchOptions, deleteMethod, fetch, getMethod, headMethod, headers, includeCredentials, json, makeHeaders, omitCredentials, patchMethod, postMethod, putMethod, redirectError, redirectFollow, redirectManual, sameOriginCredentials, statusCode, text, url) as Yoga.Fetch
+import Script.Command.Grammar
+  ( AddOption
+  , AddPositional
+  , AddSubcommand
+  , BooleanValue
+  , Cardinality
+  , CharValue
+  , Command
+  , Grammar
+  , IntValue
+  , Many
+  , Name
+  , Names
+  , NoNames
+  , NoOperand
+  , NoOptions
+  , NoPositionals
+  , NoSubcommands
+  , NumberValue
+  , Once
+  , One
+  , Operand
+  , Optional
+  , Options
+  , Positionals
+  , Repeat
+  , Repeatable
+  , RequiredOperand
+  , Some
+  , Subcommands
+  , TextValue
+  , ValueKind
+  ) as Script.Command.Grammar
+import Script.Command.Grammars
+  ( CatGrammarDefinition
+  , CpGrammarDefinition
+  , FindGrammarDefinition
+  , GhGrammarDefinition
+  , GitGrammarDefinition
+  , GrepGrammarDefinition
+  , HeadGrammarDefinition
+  , JjGrammarDefinition
+  , LsGrammarDefinition
+  , MkdirGrammarDefinition
+  , MvGrammarDefinition
+  , PursGrammarDefinition
+  , PursTidyGrammarDefinition
+  , RgGrammarDefinition
+  , RmGrammarDefinition
+  , SedGrammarDefinition
+  , SortGrammarDefinition
+  , SpagoGrammarDefinition
+  , TailGrammarDefinition
+  , TeeGrammarDefinition
+  , TouchGrammarDefinition
+  , UniqGrammarDefinition
+  , WcGrammarDefinition
+  , WhichGrammarDefinition
+  )
+import Script.Command.Grammars
+  ( CatGrammarDefinition
+  , CpGrammarDefinition
+  , FindGrammarDefinition
+  , GhGrammarDefinition
+  , GitGrammarDefinition
+  , GrepGrammarDefinition
+  , HeadGrammarDefinition
+  , JjGrammarDefinition
+  , LsGrammarDefinition
+  , MkdirGrammarDefinition
+  , MvGrammarDefinition
+  , PursGrammarDefinition
+  , PursTidyGrammarDefinition
+  , RgGrammarDefinition
+  , RmGrammarDefinition
+  , SedGrammarDefinition
+  , SortGrammarDefinition
+  , SpagoGrammarDefinition
+  , TailGrammarDefinition
+  , TeeGrammarDefinition
+  , TouchGrammarDefinition
+  , UniqGrammarDefinition
+  , WcGrammarDefinition
+  , WhichGrammarDefinition
+  ) as Script.Command.Grammars
+import Script.Command.Typed
+  ( CommandInvocation(..)
+  , class GrammarCommand
+  , class TypedArgs
+  , grammarCommand
+  , typedArgs
+  , typedCommand
+  )
+import Script.Command.Typed
+  ( CommandInvocation(..)
+  , class GrammarCommand
+  , class TypedArgs
+  , grammarCommand
+  , typedArgs
+  , typedCommand
+  ) as Script.Command.Typed
+import Script.Prelude.Cookie (Cookie, CookieAttribute, ResponseHeaders, SetCookie, cookie, cookieHeader, cookiesFromHeaders, cookiesFromResponseHeaders, parseCookieHeader, parseSetCookieHeader, setCookie, setCookieHeader) as Script.Prelude.Cookie
+import Yoga.Fetch (URL(..), Fetch, Response, Method, Headers, Redirect, Credentials, arrayBuffer, defaultFetchOptions, deleteMethod, fetch, getMethod, headMethod, headers, includeCredentials, json, makeHeaders, omitCredentials, patchMethod, postMethod, putMethod, redirectError, redirectFollow, redirectManual, sameOriginCredentials, statusCode, text, url) as Yoga.Fetch
 import Yoga.Fetch.Om (class DeriveClient, class DeriveClientFn, class DeriveClientRL, class RecordRow, class ToHeaders, client, deriveClient, deriveClientFn, deriveClientImpl, deriveClientRL, plainText, toHeaders) as Yoga.Fetch.Om
 import Yoga.Format (class ParseTemplate, fmt, format)
 import Yoga.Format (fmt, format) as Yoga.Format
@@ -307,23 +371,6 @@ import Yoga.JSON hiding (read, write) as Yoga.JSON
 import Yoga.Om (Om)
 import Yoga.Om (Om(..), ParOm(..), delay, error, expand, expandCtx, expandErr, fatal, fromAff, handleErrors, handleErrors', inParallel, launchOm, launchOm_, mapError, note, noteM, onError, parOmToAff, race, readerT, runOm, runOmRecord, runOms, runOmsInOm, runReader, sequenceOmRecord, tap, tapM, throw, throwLeftAs, throwLeftAsM, toOm, unliftAff, unliftAffFn, widenCtx) as Yoga.Om
 
-type Cookie =
-  { name :: String
-  , value :: String
-  }
-
-type CookieAttribute =
-  { name :: String
-  , value :: Maybe String
-  }
-
-type SetCookie =
-  { name :: String
-  , value :: String
-  , attributes :: Array CookieAttribute
-  }
-
-type ResponseHeaders = Fetch.Headers.Headers
 
 type CommandResult =
   { code :: Int
@@ -337,396 +384,6 @@ type ExecaProcess = Execa.ExecaProcess
 
 type ExecaResult = Execa.ExecaResult
 
-class KnownArgs (args :: Symbol) where
-  knownArgs :: Array String
-
-instance IsSymbol args => KnownArgs args where
-  knownArgs = splitArgs $ reflectSymbol (Proxy :: Proxy args)
-
-class KnownTemplateArgs (args :: Symbol) input where
-  templateArgs :: input -> Array String
-
-instance
-  ( IsSymbol args
-  , ParseTemplate args segments
-  , RenderInput segments input
-  ) =>
-  KnownTemplateArgs args input where
-  templateArgs values = splitArgs $ fmt @args values
-
-class LsArgs (args :: Symbol) where
-  lsKnownArgs :: Array String
-
-instance (IsSymbol args, ValidateLsArgs args) => LsArgs args where
-  lsKnownArgs = splitArgs $ reflectSymbol (Proxy :: Proxy args)
-
-class ValidateLsArgs :: Symbol -> Constraint
-class ValidateLsArgs args
-
-instance ValidateLsArgs ""
-else instance (Symbol.Cons head tail args, ValidateLsToken head tail) => ValidateLsArgs args
-
-class ValidateLsToken :: Symbol -> Symbol -> Constraint
-class ValidateLsToken head tail
-
-instance ValidateLsArgs tail => ValidateLsToken " " tail
-else instance ValidateLsFlagToken tail => ValidateLsToken "-" tail
-else instance ValidateLsPlainToken tail => ValidateLsToken head tail
-
-class ValidateLsPlainToken :: Symbol -> Constraint
-class ValidateLsPlainToken args
-
-instance ValidateLsPlainToken ""
-else instance (Symbol.Cons head tail args, ValidateLsPlainTokenChar head tail) => ValidateLsPlainToken args
-
-class ValidateLsPlainTokenChar :: Symbol -> Symbol -> Constraint
-class ValidateLsPlainTokenChar head tail
-
-instance ValidateLsArgs tail => ValidateLsPlainTokenChar " " tail
-else instance ValidateLsPlainToken tail => ValidateLsPlainTokenChar head tail
-
-class ValidateLsFlagToken :: Symbol -> Constraint
-class ValidateLsFlagToken args
-
-instance ValidateLsFlagToken ""
-else instance (Symbol.Cons head tail args, ValidateLsFlag head tail) => ValidateLsFlagToken args
-
-class ValidateLsFlag :: Symbol -> Symbol -> Constraint
-class ValidateLsFlag head tail
-
-instance ValidateLsArgs tail => ValidateLsFlag " " tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "1" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "@" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "A" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "B" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "C" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "F" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "G" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "H" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "L" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "O" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "P" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "R" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "S" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "T" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "U" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "W" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "a" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "b" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "c" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "d" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "e" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "f" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "g" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "h" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "i" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "k" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "l" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "m" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "n" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "o" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "p" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "q" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "r" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "s" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "t" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "u" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "v" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "w" tail
-else instance ValidateLsFlagToken tail => ValidateLsFlag "x" tail
-else instance Fail (Beside (Text "Illegal ls option: -") (Text flag)) => ValidateLsFlag flag tail
-
-class RmArgs (args :: Symbol) where
-  rmKnownArgs :: Array String
-
-instance (IsSymbol args, ValidateRmArgs args) => RmArgs args where
-  rmKnownArgs = splitArgs $ reflectSymbol (Proxy :: Proxy args)
-
-class ValidateRmArgs :: Symbol -> Constraint
-class ValidateRmArgs args
-
-instance ValidateRmArgs ""
-else instance (Symbol.Cons head tail args, ValidateRmToken head tail) => ValidateRmArgs args
-
-class ValidateRmToken :: Symbol -> Symbol -> Constraint
-class ValidateRmToken head tail
-
-instance ValidateRmArgs tail => ValidateRmToken " " tail
-else instance ValidateRmFlagToken tail => ValidateRmToken "-" tail
-else instance ValidateRmPlainToken tail => ValidateRmToken head tail
-
-class ValidateRmPlainToken :: Symbol -> Constraint
-class ValidateRmPlainToken args
-
-instance ValidateRmPlainToken ""
-else instance (Symbol.Cons head tail args, ValidateRmPlainTokenChar head tail) => ValidateRmPlainToken args
-
-class ValidateRmPlainTokenChar :: Symbol -> Symbol -> Constraint
-class ValidateRmPlainTokenChar head tail
-
-instance ValidateRmArgs tail => ValidateRmPlainTokenChar " " tail
-else instance ValidateRmPlainToken tail => ValidateRmPlainTokenChar head tail
-
-class ValidateRmFlagToken :: Symbol -> Constraint
-class ValidateRmFlagToken args
-
-instance ValidateRmFlagToken ""
-else instance (Symbol.Cons head tail args, ValidateRmFlag head tail) => ValidateRmFlagToken args
-
-class ValidateRmFlag :: Symbol -> Symbol -> Constraint
-class ValidateRmFlag head tail
-
-instance ValidateRmArgs tail => ValidateRmFlag " " tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "P" tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "R" tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "W" tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "d" tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "f" tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "i" tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "r" tail
-else instance ValidateRmFlagToken tail => ValidateRmFlag "v" tail
-else instance Fail (Beside (Text "Illegal rm option: -") (Text flag)) => ValidateRmFlag flag tail
-
-class CmdArgs (command :: Symbol) (args :: Symbol) where
-  cmdKnownArgs :: Array String
-
-instance (IsSymbol args, ValidateCommandArgs command args) => CmdArgs command args where
-  cmdKnownArgs = splitArgs $ reflectSymbol (Proxy :: Proxy args)
-
-class ValidateCommandArgs :: Symbol -> Symbol -> Constraint
-class ValidateCommandArgs command args
-
-instance ValidateCommandArgs command ""
-else instance (Symbol.Cons head tail args, ValidateCommandToken command head tail) => ValidateCommandArgs command args
-
-class ValidateCommandToken :: Symbol -> Symbol -> Symbol -> Constraint
-class ValidateCommandToken command head tail
-
-instance ValidateCommandArgs command tail => ValidateCommandToken command " " tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandToken command "-" tail
-else instance ValidateCommandPlainToken command tail => ValidateCommandToken command head tail
-
-class ValidateCommandPlainToken :: Symbol -> Symbol -> Constraint
-class ValidateCommandPlainToken command args
-
-instance ValidateCommandPlainToken command ""
-else instance (Symbol.Cons head tail args, ValidateCommandPlainTokenChar command head tail) => ValidateCommandPlainToken command args
-
-class ValidateCommandPlainTokenChar :: Symbol -> Symbol -> Symbol -> Constraint
-class ValidateCommandPlainTokenChar command head tail
-
-instance ValidateCommandArgs command tail => ValidateCommandPlainTokenChar command " " tail
-else instance ValidateCommandPlainToken command tail => ValidateCommandPlainTokenChar command head tail
-
-class ValidateCommandFlagToken :: Symbol -> Symbol -> Constraint
-class ValidateCommandFlagToken command args
-
-instance ValidateCommandFlagToken command ""
-else instance (Symbol.Cons head tail args, ValidateCommandFlag command head tail) => ValidateCommandFlagToken command args
-
-class ValidateCommandFlag :: Symbol -> Symbol -> Symbol -> Constraint
-class ValidateCommandFlag command head tail
-
-instance ValidateCommandArgs command tail => ValidateCommandFlag command " " tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag command "-" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "H" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "L" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "P" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "R" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "X" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "p" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "cp" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "mv" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "mv" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "mv" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "mv" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "mkdir" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "mkdir" "p" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "mkdir" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "A" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "B" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "C" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "E" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "F" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "H" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "I" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "L" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "R" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "V" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "b" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "e" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "l" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "o" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "q" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "r" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "s" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "w" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "grep" "x" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "H" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "L" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "P" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "X" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "d" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "e" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "p" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "s" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "t" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "find" "x" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "V" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "b" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "d" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "g" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "k" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "o" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "r" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "s" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "t" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "u" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sort" "z" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "uniq" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "uniq" "d" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "uniq" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "uniq" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "uniq" "s" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "uniq" "u" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "b" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "d" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "e" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "g" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "l" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "o" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "p" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "q" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "r" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "s" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "t" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "u" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "w" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "x" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "y" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "git" "z" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "b" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "d" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "e" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "l" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "o" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "p" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "q" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "r" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "s" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "t" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "u" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "spago" "x" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "A" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "B" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "C" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "F" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "H" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "I" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "L" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "M" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "N" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "P" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "S" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "U" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "V" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "e" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "g" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "j" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "l" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "o" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "p" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "q" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "r" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "s" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "t" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "u" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "w" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "rg" "x" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sed" "E" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sed" "e" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sed" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sed" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sed" "l" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "sed" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "head" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "head" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "head" "q" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "head" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tail" "F" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tail" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tail" "f" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tail" "n" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tail" "q" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tail" "r" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tail" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "wc" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "wc" "l" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "wc" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "wc" "w" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tee" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "tee" "i" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "touch" "A" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "touch" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "touch" "c" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "touch" "m" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "touch" "r" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "touch" "t" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "which" "a" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "jj" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "jj" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "gh" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "gh" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "purs" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "purs" "v" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "purs-tidy" "h" tail
-else instance ValidateCommandFlagToken command tail => ValidateCommandFlag "purs-tidy" "v" tail
-else instance Fail (Beside (Beside (Text "Illegal option for ") (Text command)) (Beside (Text ": -") (Text flag))) => ValidateCommandFlag command flag tail
 
 class ToArgs args where
   toArgs :: args -> Array String
@@ -855,20 +512,20 @@ unlink path = FS.unlink path # liftAff
 rmdir :: forall m. MonadAff m => FilePath -> m Unit
 rmdir path = FS.rmdir path # liftAff
 
-rm :: forall @args input m. RmArgs args => KnownTemplateArgs args input => MonadAff m => input -> m Unit
-rm values = x_ "rm" (templateArgs @args values)
+rm :: forall @args input m. TypedArgs RmGrammarDefinition args input => MonadAff m => input -> m Unit
+rm values = x_ "rm" (typedArgs @RmGrammarDefinition @args values)
 
-rm_ :: forall @args m. RmArgs args => MonadAff m => m Unit
-rm_ = x_ "rm" (rmKnownArgs @args)
+rm_ :: forall @args m. TypedArgs RmGrammarDefinition args {} => MonadAff m => m Unit
+rm_ = x_ "rm" (typedArgs @RmGrammarDefinition @args {})
 
 rmArgs :: forall args m. ToArgs args => MonadAff m => args -> m Unit
 rmArgs = x_ "rm"
 
-mkdir :: forall @args input m. CmdArgs "mkdir" args => KnownTemplateArgs args input => MonadAff m => input -> m Unit
-mkdir values = x_ "mkdir" (templateArgs @args values)
+mkdir :: forall @args input m. TypedArgs MkdirGrammarDefinition args input => MonadAff m => input -> m Unit
+mkdir values = x_ "mkdir" (typedArgs @MkdirGrammarDefinition @args values)
 
-mkdir_ :: forall @args m. CmdArgs "mkdir" args => MonadAff m => m Unit
-mkdir_ = x_ "mkdir" (cmdKnownArgs @"mkdir" @args)
+mkdir_ :: forall @args m. TypedArgs MkdirGrammarDefinition args {} => MonadAff m => m Unit
+mkdir_ = x_ "mkdir" (typedArgs @MkdirGrammarDefinition @args {})
 
 mkdirArgs :: forall args m. ToArgs args => MonadAff m => args -> m Unit
 mkdirArgs = x_ "mkdir"
@@ -885,11 +542,11 @@ removeDir path = FS.rm' path defaultRmOptions { recursive = true } # liftAff
 listDir :: forall m. MonadAff m => FilePath -> m (Array FilePath)
 listDir path = FS.readdir path # liftAff
 
-ls :: forall @args input m. LsArgs args => KnownTemplateArgs args input => MonadAff m => input -> m String
-ls values = x "ls" (templateArgs @args values)
+ls :: forall @args input m. TypedArgs LsGrammarDefinition args input => MonadAff m => input -> m String
+ls values = x "ls" (typedArgs @LsGrammarDefinition @args values)
 
-ls_ :: forall @args m. LsArgs args => MonadAff m => m String
-ls_ = x "ls" (lsKnownArgs @args)
+ls_ :: forall @args m. TypedArgs LsGrammarDefinition args {} => MonadAff m => m String
+ls_ = x "ls" (typedArgs @LsGrammarDefinition @args {})
 
 lsArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 lsArgs = x "ls"
@@ -909,8 +566,14 @@ readTextFile = readTextFileWith UTF8
 read :: forall m. MonadAff m => FilePath -> m String
 read = readTextFile
 
-cat :: forall m. MonadAff m => FilePath -> m String
-cat = readTextFile
+cat :: forall @args input m. TypedArgs CatGrammarDefinition args input => MonadAff m => input -> m String
+cat values = x "cat" (typedArgs @CatGrammarDefinition @args values)
+
+cat_ :: forall @args m. TypedArgs CatGrammarDefinition args {} => MonadAff m => m String
+cat_ = x "cat" (typedArgs @CatGrammarDefinition @args {})
+
+catArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
+catArgs = x "cat"
 
 readTextFileWith :: forall m. MonadAff m => Encoding -> FilePath -> m String
 readTextFileWith encoding path = FS.readTextFile encoding path # liftAff
@@ -1007,77 +670,6 @@ cmdHere command = do
   dir <- here
   _.stdout <$> cmdWith command (_ { cwd = Just dir })
 
-cookie :: String -> String -> Cookie
-cookie name value = { name, value }
-
-cookieHeader :: Array Cookie -> String
-cookieHeader cookies = cookies <#> renderCookie # String.joinWith "; "
-
-parseCookieHeader :: String -> Array Cookie
-parseCookieHeader header = do
-  header
-    # String.split (Pattern ";")
-    # Array.mapMaybe parseCookiePair
-
-setCookie :: String -> String -> Array CookieAttribute -> SetCookie
-setCookie name value attributes = { name, value, attributes }
-
-setCookieHeader :: SetCookie -> String
-setCookieHeader set = do
-  let renderedAttributes = set.attributes <#> renderCookieAttribute
-  String.joinWith "; " $ [ renderCookie { name: set.name, value: set.value } ] <> renderedAttributes
-
-parseSetCookieHeader :: String -> SetCookie
-parseSetCookieHeader header = do
-  let parts = String.split (Pattern ";") header
-  let parsed = parts # Array.mapMaybe parseCookieAttribute
-  case Array.uncons parsed of
-    Just { head: first, tail: attributes } -> { name: first.name, value: maybe "" identity first.value, attributes }
-    Nothing -> { name: "", value: "", attributes: [] }
-
-cookiesFromHeaders :: Yoga.Fetch.Headers -> Array SetCookie
-cookiesFromHeaders headers = do
-  Object.toArrayWithKey (/\) headers
-    # Array.mapMaybe headerSetCookie
-
-cookiesFromResponseHeaders :: ResponseHeaders -> Array SetCookie
-cookiesFromResponseHeaders headers = do
-  Fetch.Headers.toArray headers
-    # Array.mapMaybe headerSetCookie
-
-renderCookie :: Cookie -> String
-renderCookie { name, value } = name <> "=" <> value
-
-renderCookieAttribute :: CookieAttribute -> String
-renderCookieAttribute { name, value } = case value of
-  Just attributeValue -> name <> "=" <> attributeValue
-  Nothing -> name
-
-parseCookiePair :: String -> Maybe Cookie
-parseCookiePair text = do
-  name /\ value <- splitCookiePart text
-  pure { name, value }
-
-parseCookieAttribute :: String -> Maybe CookieAttribute
-parseCookieAttribute text = case splitCookiePart text of
-  Just (name /\ value) -> Just { name, value: Just value }
-  Nothing -> do
-    let name = String.trim text
-    if name == "" then Nothing
-    else Just { name, value: Nothing }
-
-splitCookiePart :: String -> Maybe (String /\ String)
-splitCookiePart text = do
-  index <- String.CodeUnits.indexOf (Pattern "=") text
-  let name = String.trim $ String.CodeUnits.take index text
-  let value = String.trim $ String.CodeUnits.drop (index + 1) text
-  if name == "" then Nothing
-  else Just $ name /\ value
-
-headerSetCookie :: String /\ String -> Maybe SetCookie
-headerSetCookie (name /\ value)
-  | String.toLower name == "set-cookie" = Just $ parseSetCookieHeader value
-  | otherwise = Nothing
 
 gum :: forall args m. ToArgs args => MonadAff m => args -> m String
 gum commandArgs = xWith gumBin commandArgs interactive
@@ -1803,204 +1395,218 @@ stream options = options
   , stderr = Just inherit
   }
 
-mv :: forall @args input m. CmdArgs "mv" args => KnownTemplateArgs args input => MonadAff m => input -> m Unit
-mv values = x_ "mv" (templateArgs @args values)
+mv :: forall @args input m. TypedArgs MvGrammarDefinition args input => MonadAff m => input -> m Unit
+mv values = x_ "mv" (typedArgs @MvGrammarDefinition @args values)
 
-mv_ :: forall @args m. CmdArgs "mv" args => MonadAff m => m Unit
-mv_ = x_ "mv" (cmdKnownArgs @"mv" @args)
+mv_ :: forall @args m. TypedArgs MvGrammarDefinition args {} => MonadAff m => m Unit
+mv_ = x_ "mv" (typedArgs @MvGrammarDefinition @args {})
 
 mvArgs :: forall args m. ToArgs args => MonadAff m => args -> m Unit
 mvArgs = x_ "mv"
 
-cp :: forall @args input m. CmdArgs "cp" args => KnownTemplateArgs args input => MonadAff m => input -> m Unit
-cp values = x_ "cp" (templateArgs @args values)
+cp :: forall @args input m. TypedArgs CpGrammarDefinition args input => MonadAff m => input -> m Unit
+cp values = x_ "cp" (typedArgs @CpGrammarDefinition @args values)
 
-cp_ :: forall @args m. CmdArgs "cp" args => MonadAff m => m Unit
-cp_ = x_ "cp" (cmdKnownArgs @"cp" @args)
+cp_ :: forall @args m. TypedArgs CpGrammarDefinition args {} => MonadAff m => m Unit
+cp_ = x_ "cp" (typedArgs @CpGrammarDefinition @args {})
 
 cpArgs :: forall args m. ToArgs args => MonadAff m => args -> m Unit
 cpArgs = x_ "cp"
 
-git :: forall @args input m. CmdArgs "git" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-git values = x "git" (templateArgs @args values)
+git :: forall @args input m. TypedArgs GitGrammarDefinition args input => MonadAff m => input -> m String
+git values = x "git" (typedArgs @GitGrammarDefinition @args values)
 
-git_ :: forall @args m. CmdArgs "git" args => MonadAff m => m String
-git_ = x "git" (cmdKnownArgs @"git" @args)
+git_ :: forall @args m. TypedArgs GitGrammarDefinition args {} => MonadAff m => m String
+git_ = x "git" (typedArgs @GitGrammarDefinition @args {})
 
 gitArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 gitArgs = x "git"
 
-spago :: forall @args input m. CmdArgs "spago" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-spago values = x "spago" (templateArgs @args values)
+spago :: forall @args input m. TypedArgs SpagoGrammarDefinition args input => MonadAff m => input -> m String
+spago values = x "spago" (typedArgs @SpagoGrammarDefinition @args values)
 
-spago_ :: forall @args m. CmdArgs "spago" args => MonadAff m => m String
-spago_ = x "spago" (cmdKnownArgs @"spago" @args)
+spago_ :: forall @args m. TypedArgs SpagoGrammarDefinition args {} => MonadAff m => m String
+spago_ = x "spago" (typedArgs @SpagoGrammarDefinition @args {})
 
 spagoArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 spagoArgs = x "spago"
 
-grep :: forall @args input m. CmdArgs "grep" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-grep values = x "grep" (templateArgs @args values)
+grep :: forall @args input m. TypedArgs GrepGrammarDefinition args input => MonadAff m => input -> m String
+grep values = x "grep" (typedArgs @GrepGrammarDefinition @args values)
 
-grep_ :: forall @args m. CmdArgs "grep" args => MonadAff m => m String
-grep_ = x "grep" (cmdKnownArgs @"grep" @args)
+grep_ :: forall @args m. TypedArgs GrepGrammarDefinition args {} => MonadAff m => m String
+grep_ = x "grep" (typedArgs @GrepGrammarDefinition @args {})
 
 grepArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 grepArgs = x "grep"
 
-find :: forall @args input m. CmdArgs "find" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-find values = x "find" (templateArgs @args values)
+find :: forall @args input m. TypedArgs FindGrammarDefinition args input => MonadAff m => input -> m String
+find values = x "find" (typedArgs @FindGrammarDefinition @args values)
 
-find_ :: forall @args m. CmdArgs "find" args => MonadAff m => m String
-find_ = x "find" (cmdKnownArgs @"find" @args)
+find_ :: forall @args m. TypedArgs FindGrammarDefinition args {} => MonadAff m => m String
+find_ = x "find" (typedArgs @FindGrammarDefinition @args {})
 
 findArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 findArgs = x "find"
 
-sort :: forall @args input m. CmdArgs "sort" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-sort values = x "sort" (templateArgs @args values)
+sort :: forall @args input m. TypedArgs SortGrammarDefinition args input => MonadAff m => input -> m String
+sort values = x "sort" (typedArgs @SortGrammarDefinition @args values)
 
-sort_ :: forall @args m. CmdArgs "sort" args => MonadAff m => m String
-sort_ = x "sort" (cmdKnownArgs @"sort" @args)
+sort_ :: forall @args m. TypedArgs SortGrammarDefinition args {} => MonadAff m => m String
+sort_ = x "sort" (typedArgs @SortGrammarDefinition @args {})
 
 sortArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 sortArgs = x "sort"
 
-uniq :: forall @args input m. CmdArgs "uniq" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-uniq values = x "uniq" (templateArgs @args values)
+uniq :: forall @args input m. TypedArgs UniqGrammarDefinition args input => MonadAff m => input -> m String
+uniq values = x "uniq" (typedArgs @UniqGrammarDefinition @args values)
 
-uniq_ :: forall @args m. CmdArgs "uniq" args => MonadAff m => m String
-uniq_ = x "uniq" (cmdKnownArgs @"uniq" @args)
+uniq_ :: forall @args m. TypedArgs UniqGrammarDefinition args {} => MonadAff m => m String
+uniq_ = x "uniq" (typedArgs @UniqGrammarDefinition @args {})
 
 uniqArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 uniqArgs = x "uniq"
 
-rg :: forall @args input m. CmdArgs "rg" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-rg values = x "rg" (templateArgs @args values)
+rg :: forall @args input m. TypedArgs RgGrammarDefinition args input => MonadAff m => input -> m String
+rg values = x "rg" (typedArgs @RgGrammarDefinition @args values)
 
-rg_ :: forall @args m. CmdArgs "rg" args => MonadAff m => m String
-rg_ = x "rg" (cmdKnownArgs @"rg" @args)
+rg_ :: forall @args m. TypedArgs RgGrammarDefinition args {} => MonadAff m => m String
+rg_ = x "rg" (typedArgs @RgGrammarDefinition @args {})
 
 rgArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 rgArgs = x "rg"
 
-jj :: forall @args input m. CmdArgs "jj" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-jj values = x "jj" (templateArgs @args values)
+jj :: forall @args input m. TypedArgs JjGrammarDefinition args input => MonadAff m => input -> m String
+jj values = x "jj" (typedArgs @JjGrammarDefinition @args values)
 
-jj_ :: forall @args m. CmdArgs "jj" args => MonadAff m => m String
-jj_ = x "jj" (cmdKnownArgs @"jj" @args)
+jj_ :: forall @args m. TypedArgs JjGrammarDefinition args {} => MonadAff m => m String
+jj_ = x "jj" (typedArgs @JjGrammarDefinition @args {})
 
 jjArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 jjArgs = x "jj"
 
-gh :: forall @args input m. CmdArgs "gh" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-gh values = x "gh" (templateArgs @args values)
+gh :: forall @args input m. TypedArgs GhGrammarDefinition args input => MonadAff m => input -> m String
+gh values = x "gh" (typedArgs @GhGrammarDefinition @args values)
 
-gh_ :: forall @args m. CmdArgs "gh" args => MonadAff m => m String
-gh_ = x "gh" (cmdKnownArgs @"gh" @args)
+gh_ :: forall @args m. TypedArgs GhGrammarDefinition args {} => MonadAff m => m String
+gh_ = x "gh" (typedArgs @GhGrammarDefinition @args {})
 
 ghArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 ghArgs = x "gh"
 
-purs :: forall @args input m. CmdArgs "purs" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-purs values = x "purs" (templateArgs @args values)
+purs :: forall @args input m. TypedArgs PursGrammarDefinition args input => MonadAff m => input -> m String
+purs values = x "purs" (typedArgs @PursGrammarDefinition @args values)
 
-purs_ :: forall @args m. CmdArgs "purs" args => MonadAff m => m String
-purs_ = x "purs" (cmdKnownArgs @"purs" @args)
+purs_ :: forall @args m. TypedArgs PursGrammarDefinition args {} => MonadAff m => m String
+purs_ = x "purs" (typedArgs @PursGrammarDefinition @args {})
 
 pursArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 pursArgs = x "purs"
 
-pursTidy :: forall @args input m. CmdArgs "purs-tidy" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-pursTidy values = x "purs-tidy" (templateArgs @args values)
+pursTidy :: forall @args input m. TypedArgs PursTidyGrammarDefinition args input => MonadAff m => input -> m String
+pursTidy values = x "purs-tidy" (typedArgs @PursTidyGrammarDefinition @args values)
 
-pursTidy_ :: forall @args m. CmdArgs "purs-tidy" args => MonadAff m => m String
-pursTidy_ = x "purs-tidy" (cmdKnownArgs @"purs-tidy" @args)
+pursTidy_ :: forall @args m. TypedArgs PursTidyGrammarDefinition args {} => MonadAff m => m String
+pursTidy_ = x "purs-tidy" (typedArgs @PursTidyGrammarDefinition @args {})
 
 pursTidyArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 pursTidyArgs = x "purs-tidy"
 
-sed :: forall @args input m. CmdArgs "sed" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-sed values = x "sed" (templateArgs @args values)
+sed :: forall @args input m. TypedArgs SedGrammarDefinition args input => MonadAff m => input -> m String
+sed values = x "sed" (typedArgs @SedGrammarDefinition @args values)
 
-sed_ :: forall @args m. CmdArgs "sed" args => MonadAff m => m String
-sed_ = x "sed" (cmdKnownArgs @"sed" @args)
+sed_ :: forall @args m. TypedArgs SedGrammarDefinition args {} => MonadAff m => m String
+sed_ = x "sed" (typedArgs @SedGrammarDefinition @args {})
 
 sedArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 sedArgs = x "sed"
 
-head :: forall @args input m. CmdArgs "head" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-head values = x "head" (templateArgs @args values)
+head :: forall @args input m. TypedArgs HeadGrammarDefinition args input => MonadAff m => input -> m String
+head values = x "head" (typedArgs @HeadGrammarDefinition @args values)
 
-head_ :: forall @args m. CmdArgs "head" args => MonadAff m => m String
-head_ = x "head" (cmdKnownArgs @"head" @args)
+head_ :: forall @args m. TypedArgs HeadGrammarDefinition args {} => MonadAff m => m String
+head_ = x "head" (typedArgs @HeadGrammarDefinition @args {})
 
 headArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 headArgs = x "head"
 
-tail :: forall @args input m. CmdArgs "tail" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-tail values = x "tail" (templateArgs @args values)
+tail :: forall @args input m. TypedArgs TailGrammarDefinition args input => MonadAff m => input -> m String
+tail values = x "tail" (typedArgs @TailGrammarDefinition @args values)
 
-tail_ :: forall @args m. CmdArgs "tail" args => MonadAff m => m String
-tail_ = x "tail" (cmdKnownArgs @"tail" @args)
+tail_ :: forall @args m. TypedArgs TailGrammarDefinition args {} => MonadAff m => m String
+tail_ = x "tail" (typedArgs @TailGrammarDefinition @args {})
 
 tailArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 tailArgs = x "tail"
 
-wc :: forall @args input m. CmdArgs "wc" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-wc values = x "wc" (templateArgs @args values)
+wc :: forall @args input m. TypedArgs WcGrammarDefinition args input => MonadAff m => input -> m String
+wc values = x "wc" (typedArgs @WcGrammarDefinition @args values)
 
-wc_ :: forall @args m. CmdArgs "wc" args => MonadAff m => m String
-wc_ = x "wc" (cmdKnownArgs @"wc" @args)
+wc_ :: forall @args m. TypedArgs WcGrammarDefinition args {} => MonadAff m => m String
+wc_ = x "wc" (typedArgs @WcGrammarDefinition @args {})
 
 wcArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 wcArgs = x "wc"
 
-tee :: forall @args input m. CmdArgs "tee" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-tee values = x "tee" (templateArgs @args values)
+tee :: forall @args input m. TypedArgs TeeGrammarDefinition args input => MonadAff m => input -> m String
+tee values = x "tee" (typedArgs @TeeGrammarDefinition @args values)
 
-tee_ :: forall @args m. CmdArgs "tee" args => MonadAff m => m String
-tee_ = x "tee" (cmdKnownArgs @"tee" @args)
+tee_ :: forall @args m. TypedArgs TeeGrammarDefinition args {} => MonadAff m => m String
+tee_ = x "tee" (typedArgs @TeeGrammarDefinition @args {})
 
 teeArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 teeArgs = x "tee"
 
-touch :: forall @args input m. CmdArgs "touch" args => KnownTemplateArgs args input => MonadAff m => input -> m Unit
-touch values = x_ "touch" (templateArgs @args values)
+touch :: forall @args input m. TypedArgs TouchGrammarDefinition args input => MonadAff m => input -> m Unit
+touch values = x_ "touch" (typedArgs @TouchGrammarDefinition @args values)
 
-touch_ :: forall @args m. CmdArgs "touch" args => MonadAff m => m Unit
-touch_ = x_ "touch" (cmdKnownArgs @"touch" @args)
+touch_ :: forall @args m. TypedArgs TouchGrammarDefinition args {} => MonadAff m => m Unit
+touch_ = x_ "touch" (typedArgs @TouchGrammarDefinition @args {})
 
 touchArgs :: forall args m. ToArgs args => MonadAff m => args -> m Unit
 touchArgs = x_ "touch"
 
-which :: forall @args input m. CmdArgs "which" args => KnownTemplateArgs args input => MonadAff m => input -> m String
-which values = x "which" (templateArgs @args values)
+which :: forall @args input m. TypedArgs WhichGrammarDefinition args input => MonadAff m => input -> m String
+which values = x "which" (typedArgs @WhichGrammarDefinition @args values)
 
-which_ :: forall @args m. CmdArgs "which" args => MonadAff m => m String
-which_ = x "which" (cmdKnownArgs @"which" @args)
+which_ :: forall @args m. TypedArgs WhichGrammarDefinition args {} => MonadAff m => m String
+which_ = x "which" (typedArgs @WhichGrammarDefinition @args {})
 
 whichArgs :: forall args m. ToArgs args => MonadAff m => args -> m String
 whichArgs = x "which"
 
 infixl 1 pipeInto as |>
 
-pipeInto :: forall m. MonadAff m => m String -> String -> m String
-pipeInto source command = do
+class PipeTarget target where
+  pipeTarget :: forall m. MonadAff m => String -> target -> m String
+
+instance PipeTarget String where
+  pipeTarget = pipeShell
+
+instance PipeTarget CommandInvocation where
+  pipeTarget stdin (CommandInvocation { executable, arguments }) = pipeProcess stdin executable arguments
+
+pipeInto :: forall target m. PipeTarget target => MonadAff m => m String -> target -> m String
+pipeInto source target = do
   stdin <- source
-  pipe stdin command
+  pipeTarget stdin target
 
 infixr 1 pipeFrom as <|
 
-pipeFrom :: forall m. MonadAff m => String -> m String -> m String
-pipeFrom command source = source |> command
+pipeFrom :: forall target m. PipeTarget target => MonadAff m => target -> m String -> m String
+pipeFrom target source = source |> target
 
-pipe :: forall m. MonadAff m => String -> String -> m String
-pipe stdin command = do
-  spawned <- spawnWith shell [ "-c", command ] (_ { stdin = Just ChildProcess.pipe })
+pipeShell :: forall m. MonadAff m => String -> String -> m String
+pipeShell stdin command = pipeProcess stdin shell [ "-c", command ]
+  where
+  shell = "sh"
+
+pipeProcess :: forall m. MonadAff m => String -> String -> Array String -> m String
+pipeProcess stdin executable arguments = do
+  spawned <- spawnWith executable arguments (_ { stdin = Just ChildProcess.pipe })
   case spawned.stdin of
     Just childStdin -> childStdin.writeUtf8End stdin # liftAff
-    Nothing -> failWith $ "Could not open stdin for command: " <> command
+    Nothing -> failWith $ "Could not open stdin for command: " <> executable
   result <- spawned.getResult # liftAff
   _.stdout <$> ensureOk result
   where

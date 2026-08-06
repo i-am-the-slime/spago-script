@@ -22,7 +22,9 @@
     "spago.lock"
   ],
   "scripts": {
-    "test": "spago test",
+    "test": "bun run test:unit && bun run test:cli",
+    "test:unit": "spago test",
+    "test:cli": "bun test test/cli.test.js test/command-grammar.test.js",
     "pty:test": "test/pty/run"
   }
 }
