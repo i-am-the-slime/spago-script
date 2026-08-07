@@ -127,6 +127,7 @@ module Script.Prelude
   , pursTidy_
   , pursTidyArgs
   , markdown
+  , multiSelect
   , mkdirp
   , mkdtemp
   , pager
@@ -715,6 +716,9 @@ gumInput placeholder = gum [ "input", "--placeholder", placeholder ]
 select :: forall m. MonadAff m => Array String -> m String
 select choices = runPrompt $ filterPrompt choices
 
+multiSelect :: forall m. MonadAff m => Array String -> m (Array String)
+multiSelect choices = runPrompt $ multiSelectPrompt choices
+
 gumFilter :: forall m. MonadAff m => Array String -> m String
 gumFilter choices = gum ([ "filter" ] <> choices)
 
@@ -969,6 +973,73 @@ choosePrompt choices = do
           let actual = start + offset
           if actual == index then pink "> " <> pink choice
           else "  " <> choice
+
+  moveSelected selected delta = do
+    index <- Ref.read selected
+    let count = Array.length choices
+    let next = mod (index + delta + count) count
+    Ref.write next selected
+    pure Nothing
+
+multiSelectPrompt :: Array String -> Aff (Prompt (Array String))
+multiSelectPrompt choices = do
+  selected <- Ref.new 0 # liftEffect
+  checked <- Ref.new choices # liftEffect
+  pure
+    { render: renderMultiSelect selected checked
+    , handle: handleMultiSelect selected checked
+    , cancel: pure unit
+    , tick: false
+    , redrawFirstLineOnly: false
+    }
+  where
+  height = 10
+
+  renderMultiSelect selected checked = do
+    index <- Ref.read selected
+    selectedChoices <- Ref.read checked
+    pure $
+      [ purple "Select:" ]
+        <> choiceLines index selectedChoices
+        <> [ "", muted "space toggle • a all • n none • ←↓↑→ navigate • enter submit" ]
+
+  handleMultiSelect selected checked key = do
+    case multiSelectKeyAction key of
+      "cancel" -> throwPrompt "nothing selected"
+      "submit" -> Just <$> Ref.read checked
+      "toggle" -> do
+        index <- Ref.read selected
+        case Array.index choices index of
+          Nothing -> pure unit
+          Just choice -> Ref.modify_ (toggleChoice choice) checked
+        pure Nothing
+      "all" -> Ref.write choices checked *> pure Nothing
+      "none" -> Ref.write [] checked *> pure Nothing
+      "up" -> moveSelected selected (-1)
+      "down" -> moveSelected selected 1
+      "left" -> moveSelected selected (-height)
+      "right" -> moveSelected selected height
+      "home" -> Ref.write 0 selected *> pure Nothing
+      "end" -> Ref.write (Array.length choices - 1) selected *> pure Nothing
+      _ -> pure Nothing
+
+  choiceLines index selectedChoices = do
+    let page = Int.quot index height
+    let start = page * height
+    choices
+      # Array.drop start
+      # Array.take height
+      # Array.mapWithIndex \offset choice -> do
+          let actual = start + offset
+          let mark = if Array.elem choice selectedChoices then "[x] " else "[ ] "
+          if actual == index then pink "> " <> pink (mark <> choice)
+          else "  " <> mark <> choice
+
+  toggleChoice choice selectedChoices =
+    if Array.elem choice selectedChoices then
+      Array.filter (_ /= choice) selectedChoices
+    else
+      selectedChoices <> [ choice ]
 
   moveSelected selected delta = do
     index <- Ref.read selected
@@ -1254,6 +1325,28 @@ chooseKeyAction = case _ of
   KeyChar "l" -> "right"
   KeyChar "g" -> "home"
   KeyChar "G" -> "end"
+  _ -> "ignore"
+
+multiSelectKeyAction :: Key -> String
+multiSelectKeyAction = case _ of
+  KeyCtrlC -> "cancel"
+  KeyEscape -> "cancel"
+  KeyEnter -> "submit"
+  KeyUp -> "up"
+  KeyDown -> "down"
+  KeyLeft -> "left"
+  KeyRight -> "right"
+  KeyChar " " -> "toggle"
+  KeyChar "k" -> "up"
+  KeyChar "j" -> "down"
+  KeyChar "h" -> "left"
+  KeyChar "l" -> "right"
+  KeyChar "g" -> "home"
+  KeyChar "G" -> "end"
+  KeyChar "a" -> "all"
+  KeyChar "A" -> "all"
+  KeyChar "n" -> "none"
+  KeyChar "N" -> "none"
   _ -> "ignore"
 
 confirmKeyAction :: Key -> String
