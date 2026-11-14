@@ -45,6 +45,20 @@ afterAll(async () => {
     fs.rm(path.join(os.tmpdir(), entry), { force: true, recursive: true })
   ));
 });
+test("scripts query one text value from SQLite", async () => {
+  const result = await runScript("sqlite.purs", `
+main = run do
+  value <- querySQLiteText (SQLitePath ":memory:") (SQLiteQuery "select 'sqlite-ok'") # liftAff
+  log value
+`);
+
+  expect(result).toEqual({
+    exitCode: 0,
+    stdout: "sqlite-ok\n",
+    stderr: "",
+  });
+}, 60_000);
+
 
 test("concurrent scripts use isolated output and clean up workdirs", async () => {
   const mismatches = [];

@@ -1,0 +1,36 @@
+#!/usr/bin/env expect
+set timeout 60
+set script [lindex $argv 0]
+set runner /Users/mark/code/spago-script/bin/spago-script.js
+spawn sh -c "$runner $script; code=\$?; stty -a; echo EXIT=\$code; exit \$code"
+expect -re {project name}
+send "\003"
+expect {
+  -re {Interrupted\.} {}
+  -re {error: not submitted} {
+    puts stderr "Ctrl-C escaped as an uncaught prompt exception"
+    exit 1
+  }
+  timeout {
+    puts stderr "Ctrl-C did not terminate the input prompt"
+    exit 1
+  }
+}
+expect {
+  -re {error: not submitted} {
+    puts stderr "Ctrl-C printed the old stack trace"
+    exit 1
+  }
+  -re {icanon.*isig.*echo} {}
+  timeout {
+    puts stderr "terminal settings were not restored"
+    exit 1
+  }
+}
+expect -re {EXIT=130}
+expect eof
+set result [wait]
+if {[lindex $result 3] != 130} {
+  puts stderr "expected exit 130, got [lindex $result 3]"
+  exit 1
+}

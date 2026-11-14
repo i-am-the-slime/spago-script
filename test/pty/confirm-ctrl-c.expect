@@ -1,0 +1,31 @@
+#!/usr/bin/env expect
+set timeout 60
+set script [lindex $argv 0]
+set runner /Users/mark/code/spago-script/bin/spago-script.js
+spawn sh -c "$runner $script; code=\$?; echo EXIT=\$code; exit \$code"
+expect -re {Proceed\?}
+send "\003"
+expect {
+  -re {Interrupted\.} {}
+  -re {VALUE=false} {
+    puts stderr "Ctrl-C was treated as a successful No response"
+    exit 1
+  }
+  timeout {
+    puts stderr "Ctrl-C did not terminate the confirmation prompt"
+    exit 1
+  }
+}
+expect {
+  -re {VALUE=false} {
+    puts stderr "Ctrl-C continued the script"
+    exit 1
+  }
+  -re {EXIT=130} {}
+}
+expect eof
+set result [wait]
+if {[lindex $result 3] != 130} {
+  puts stderr "expected exit 130, got [lindex $result 3]"
+  exit 1
+}

@@ -18,6 +18,7 @@ module Script.Prelude
   , module Yoga.Format
   , module Yoga.Om
   , module Script.Prelude.Cookie
+  , module Script.Prelude.SQLite
   , module Script.Command.Grammar
   , module Script.Command.Grammars
   , module Script.Command.Typed
@@ -363,6 +364,7 @@ import Script.Command.Typed
   , typedCommand
   ) as Script.Command.Typed
 import Script.Prelude.Cookie (Cookie, CookieAttribute, ResponseHeaders, SetCookie, cookie, cookieHeader, cookiesFromHeaders, cookiesFromResponseHeaders, parseCookieHeader, parseSetCookieHeader, setCookie, setCookieHeader) as Script.Prelude.Cookie
+import Script.Prelude.SQLite (SQLitePath(..), SQLiteQuery(..), querySQLiteText) as Script.Prelude.SQLite
 import Yoga.Fetch (URL(..), Fetch, Response, Method, Headers, Redirect, Credentials, arrayBuffer, defaultFetchOptions, deleteMethod, fetch, getMethod, headMethod, headers, includeCredentials, json, makeHeaders, omitCredentials, patchMethod, postMethod, putMethod, redirectError, redirectFollow, redirectManual, sameOriginCredentials, statusCode, text, url) as Yoga.Fetch
 import Yoga.Fetch.Om (class DeriveClient, class DeriveClientFn, class DeriveClientRL, class RecordRow, class ToHeaders, client, deriveClient, deriveClientFn, deriveClientImpl, deriveClientRL, plainText, toHeaders) as Yoga.Fetch.Om
 import Yoga.Format (class ParseTemplate, fmt, format)
@@ -371,7 +373,6 @@ import Yoga.Format.Render (class RenderInput)
 import Yoga.JSON hiding (read, write) as Yoga.JSON
 import Yoga.Om (Om)
 import Yoga.Om (Om(..), ParOm(..), delay, error, expand, expandCtx, expandErr, fatal, fromAff, handleErrors, handleErrors', inParallel, launchOm, launchOm_, mapError, note, noteM, onError, parOmToAff, race, readerT, runOm, runOmRecord, runOms, runOmsInOm, runReader, sequenceOmRecord, tap, tapM, throw, throwLeftAs, throwLeftAsM, toOm, unliftAff, unliftAffFn, widenCtx) as Yoga.Om
-
 
 type CommandResult =
   { code :: Int
@@ -384,7 +385,6 @@ type ExecaOptions = Execa.ExecaOptions
 type ExecaProcess = Execa.ExecaProcess
 
 type ExecaResult = Execa.ExecaResult
-
 
 class ToArgs args where
   toArgs :: args -> Array String
@@ -428,9 +428,13 @@ launch :: Aff Unit -> Effect Unit
 launch script = Aff.runAff_ finish script
   where
   finish = case _ of
-    Left err -> do
-      logError (Exception.message err)
-      exit 1
+    Left err
+      | Exception.message err == promptInterruptedMessage -> do
+          logError "Interrupted."
+          exit 130
+      | otherwise -> do
+          logError (Exception.message err)
+          exit 1
     Right _ -> pure unit
 
 run :: Om {} () Unit -> Effect Unit
@@ -671,7 +675,6 @@ cmdHere command = do
   dir <- here
   _.stdout <$> cmdWith command (_ { cwd = Just dir })
 
-
 gum :: forall args m. ToArgs args => MonadAff m => args -> m String
 gum commandArgs = xWith gumBin commandArgs interactive
 
@@ -814,11 +817,12 @@ type Prompt a =
   }
 
 runPrompt :: forall m a. MonadAff m => Aff (Prompt a) -> m a
-runPrompt build = do
-  withRawTerminal do
-    prompt <- build
-    waitForPrompt prompt
-  # liftAff
+runPrompt build =
+  do
+    withRawTerminal do
+      prompt <- build
+      waitForPrompt prompt
+    # liftAff
 
 withRawTerminal :: forall a. Aff a -> Aff a
 withRawTerminal action = Aff.bracket acquire release use
@@ -840,18 +844,15 @@ waitForPrompt prompt = Aff.makeAff \finish -> do
   removeRef <- Ref.new (pure unit :: Effect Unit)
   repaint renderedLines prompt
   Stream.setEncoding Process.stdin UTF8
-  repaintInterval <- if prompt.tick then Just <$> Timer.setInterval 530 (repaint renderedLines prompt)
+  repaintInterval <-
+    if prompt.tick then Just <$> Timer.setInterval 530 (repaint renderedLines prompt)
     else pure Nothing
   remove <- Process.stdin # on Stream.dataHStr \chunk -> do
     handleKeys finish renderedLines removeRef repaintInterval finished prompt $ decodeKeys chunk
   Ref.write remove removeRef
   Stream.resume Process.stdin
-  pure $ Aff.effectCanceler do
-    Ref.write true finished
-    join $ Ref.read removeRef
-    for_ repaintInterval Timer.clearInterval
-    clearPrompt renderedLines
-    prompt.cancel
+  pure $ Aff.effectCanceler $
+    cleanupPrompt renderedLines removeRef repaintInterval finished prompt
 
 handleKeys :: forall a. (Either Exception.Error a -> Effect Unit) -> Ref.Ref Int -> Ref.Ref (Effect Unit) -> Maybe Timer.IntervalId -> Ref.Ref Boolean -> Prompt a -> Array Key -> Effect Unit
 handleKeys finish renderedLines removeRef repaintInterval finished prompt keys = do
@@ -859,19 +860,37 @@ handleKeys finish renderedLines removeRef repaintInterval finished prompt keys =
   if done then pure unit
   else case Array.uncons keys of
     Nothing -> pure unit
+    Just { head: KeyCtrlC } ->
+      completePrompt finish renderedLines removeRef repaintInterval finished prompt $
+        Left promptInterruptedError
     Just { head: key, tail: rest } -> do
-      result <- prompt.handle key
-      case result of
-        Nothing -> do
+      handled <- Exception.try $ prompt.handle key
+      case handled of
+        Left err ->
+          completePrompt finish renderedLines removeRef repaintInterval finished prompt $
+            Left err
+        Right Nothing -> do
           repaint renderedLines prompt
           handleKeys finish renderedLines removeRef repaintInterval finished prompt rest
-        Just value -> do
-          Ref.write true finished
-          join $ Ref.read removeRef
-          for_ repaintInterval Timer.clearInterval
-          clearPrompt renderedLines
-          prompt.cancel
-          finish $ Right value
+        Right (Just value) ->
+          completePrompt finish renderedLines removeRef repaintInterval finished prompt $
+            Right value
+
+completePrompt :: forall a. (Either Exception.Error a -> Effect Unit) -> Ref.Ref Int -> Ref.Ref (Effect Unit) -> Maybe Timer.IntervalId -> Ref.Ref Boolean -> Prompt a -> Either Exception.Error a -> Effect Unit
+completePrompt finish renderedLines removeRef repaintInterval finished prompt result = do
+  cleanupPrompt renderedLines removeRef repaintInterval finished prompt
+  finish result
+
+cleanupPrompt :: forall a. Ref.Ref Int -> Ref.Ref (Effect Unit) -> Maybe Timer.IntervalId -> Ref.Ref Boolean -> Prompt a -> Effect Unit
+cleanupPrompt renderedLines removeRef repaintInterval finished prompt = do
+  done <- Ref.read finished
+  unless done do
+    Ref.write true finished
+    join $ Ref.read removeRef
+    for_ repaintInterval Timer.clearInterval
+    clearPrompt renderedLines
+    prompt.cancel
+    Stream.pause Process.stdin
 
 repaint :: forall a. Ref.Ref Int -> Prompt a -> Effect Unit
 repaint renderedLines prompt = do
@@ -898,8 +917,8 @@ clearFrame :: Int -> String
 clearFrame count
   | count <= 0 = ""
   | otherwise = "\x1b[1A" <> Array.foldMap clearLine (Array.range 0 (count - 1))
-  where
-  clearLine index = "\x1b[2K\r" <> if index < count - 1 then "\x1b[1A" else ""
+      where
+      clearLine index = "\x1b[2K\r" <> if index < count - 1 then "\x1b[1A" else ""
 
 drawFrame :: Array String -> String
 drawFrame = Array.foldMap (_ <> "\r\n")
@@ -1069,6 +1088,7 @@ confirmPrompt message = do
       ]
 
   handleConfirm yes key = case confirmKeyAction key of
+    "cancel" -> throwPrompt promptInterruptedMessage
     "yes" -> pure $ Just true
     "no" -> pure $ Just false
     "submit" -> Just <$> Ref.read yes
@@ -1351,7 +1371,7 @@ multiSelectKeyAction = case _ of
 
 confirmKeyAction :: Key -> String
 confirmKeyAction = case _ of
-  KeyCtrlC -> "no"
+  KeyCtrlC -> "cancel"
   KeyEscape -> "no"
   KeyEnter -> "submit"
   KeyLeft -> "toggle"
@@ -1429,6 +1449,12 @@ cursorCell text = bg "212" $ cream text
 
 placeholderCursorCell :: String -> String
 placeholderCursorCell text = bg "212" $ muted text
+
+promptInterruptedMessage :: String
+promptInterruptedMessage = "__spago_script_prompt_interrupted__"
+
+promptInterruptedError :: Exception.Error
+promptInterruptedError = Exception.error promptInterruptedMessage
 
 throwPrompt :: forall a. String -> Effect (Maybe a)
 throwPrompt message = Exception.throw message

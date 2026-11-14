@@ -3,10 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 expect test/pty/input.expect test/pty/input-script
+expect test/pty/input-ctrl-c.expect test/pty/input-script
 expect test/pty/input-delete.expect test/pty/input-delete-script
 expect test/pty/choose.expect test/pty/choose-script
 expect test/pty/choose-vim.expect test/pty/choose-vim-script
 expect test/pty/confirm.expect test/pty/confirm-script
+expect test/pty/confirm-ctrl-c.expect test/pty/confirm-script
 expect test/pty/confirm-toggle.expect test/pty/confirm-toggle-script
 expect test/pty/filter.expect test/pty/filter-script
 expect test/pty/filter-blur.expect test/pty/filter-blur-script

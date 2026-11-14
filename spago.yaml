@@ -13,6 +13,8 @@ package:
     - integers: ">=6.0.0 <7.0.0"
     - js-fetch: ">=0.2.1 <0.3.0"
     - js-timers: ">=6.1.0 <7.0.0"
+    - js-promise: ">=1.0.0 <2.0.0"
+    - js-promise-aff: ">=1.0.0 <2.0.0"
     - maybe: ">=6.0.0 <7.0.0"
     - node-buffer: ">=9.0.0 <10.0.0"
     - node-child-process: ">=11.1.0 <12.0.0"
