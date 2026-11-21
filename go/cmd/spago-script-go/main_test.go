@@ -142,3 +142,12 @@ func binaries(t *testing.T) int {
 	}
 	return len(entries)
 }
+
+func TestABareDoBlockIsMain(t *testing.T) {
+	expect(t, runScript(t, "bare.purs", "#!/usr/bin/env spago-script-go\ndo\n  log \"bare\"\n  log \"do\"\n"), result{stdout: "bare\ndo\n"})
+}
+
+func TestImportsStayAboveTheWrappedMain(t *testing.T) {
+	source := "import Data.Array (length)\nimport Data.String as String\n\ndo\n  log (show (length [ 1, 2, 3 ]))\n  log (String.toUpper \"hi\")\n"
+	expect(t, runScript(t, "imports.purs", source), result{stdout: "3\nHI\n"})
+}

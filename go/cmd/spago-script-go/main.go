@@ -102,11 +102,57 @@ func prepare(source string) script {
 	if header := moduleHeader.FindStringSubmatch(source); header != nil {
 		return script{module: header[1], source: source}
 	}
+	imports, body := splitImports(source)
+	if at := bareDo(body); at >= 0 {
+		body = body[:at] + "main = run " + body[at:]
+	}
 	annotation := "main :: Effect Unit\n"
-	if mainSignature.MatchString(source) {
+	if mainSignature.MatchString(body) {
 		annotation = ""
 	}
-	return script{module: "Main", source: "module Main where\n\nimport Script.Prelude\n\n" + annotation + source}
+	return script{
+		module: "Main",
+		source: "module Main where\n\nimport Script.Prelude\n" + imports + "\n" + annotation + body,
+	}
+}
+
+// splitImports separates the script's own imports, with the comments and blank lines between
+// them, from the code after them. An import continues on indented lines, as in
+// `import Data.Map (Map,\n  insert)`.
+func splitImports(source string) (string, string) {
+	lines := strings.SplitAfter(source, "\n")
+	end := 0
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "import "):
+			end = index + 1
+		case trimmed == "" || strings.HasPrefix(trimmed, "--"):
+		case end > 0 && index == end && (line[0] == ' ' || line[0] == '\t'):
+			end = index + 1
+		default:
+			return strings.Join(lines[:end], ""), strings.Join(lines[end:], "")
+		}
+	}
+	return strings.Join(lines[:end], ""), strings.Join(lines[end:], "")
+}
+
+// bareDo is where the script's code starts with a bare `do` block at the left margin, which
+// becomes the body of `main = run do`, or -1 when it doesn't.
+func bareDo(body string) int {
+	offset := 0
+	for _, line := range strings.SplitAfter(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+			offset += len(line)
+			continue
+		}
+		if trimmed == "do" || strings.HasPrefix(line, "do ") || strings.HasPrefix(line, "do\t") {
+			return offset
+		}
+		return -1
+	}
+	return -1
 }
 
 func stripShebang(source string) string {
