@@ -79,6 +79,41 @@ main = run do
 ["one","two words"]
 ```
 
+## Editor support
+
+Keep your scripts in a folder and turn it into a script folder:
+
+```sh
+cd ~/scripts
+spago-script-go init
+```
+
+Then open the folder in VS Code with the
+[purescript-iris](https://marketplace.visualstudio.com/items?itemName=purefunctor.purescript-analyzer)
+extension enabled. You get types on hover and errors for `Script.Prelude`, the Go bindings and
+everything else a script can import.
+
+For that, a script is a regular module named after its file, so the scripts in one folder
+don't get in each other's way:
+
+```purescript
+#!/usr/bin/env spago-script-go
+module Hello where
+
+import Script.Prelude
+
+main :: Effect Unit
+main = run do
+  log "Hello"
+```
+
+That's `hello.purs`. `init` renames any `module Main` it finds that way and tells you. The
+shebang line is fine, the editor sees it as a comment. The short scripts without a `main` still
+run, the editor just doesn't understand them.
+
+`init` writes a `spago.yaml` and `.vscode/settings.json` into the folder. Run it again after
+updating spago-script-go.
+
 ## The prelude
 
 Everything in the [spago-script prelude](../README.md#prelude-api) works the same: files,

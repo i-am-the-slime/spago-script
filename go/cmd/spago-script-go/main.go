@@ -26,9 +26,16 @@ import (
 var bundle embed.FS
 
 const usage = `Usage: spago-script-go <script.purs> [args...]
+       spago-script-go init [DIR]
+       spago-script-go lsp [iris lsp flags...]
 
 Compiles the script to a native binary with Iris and Go, caches it by the
 script's content, and runs it with the arguments.
+
+init makes DIR (default: the current directory) a script folder for your
+editor: a spago.yaml for Iris's language server, .vscode/settings.json, and
+scripts that say module Main renamed after their file. lsp is the language
+server those settings start.
 
 Scripts without a module header are wrapped as a Main module importing
 Script.Prelude. Statements at the top become main = run do; helpers
@@ -64,8 +71,7 @@ func main() {
 		}
 		return
 	}
-	scriptPath, scriptArgs := os.Args[1], os.Args[2:]
-	if err := run(scriptPath, scriptArgs); err != nil {
+	if err := dispatch(os.Args[1], os.Args[2:]); err != nil {
 		var exit exitError
 		if errors.As(err, &exit) {
 			os.Exit(exit.code)
@@ -73,6 +79,28 @@ func main() {
 		fmt.Fprintln(os.Stderr, "spago-script-go:", err)
 		os.Exit(1)
 	}
+}
+
+// dispatch runs a subcommand, or the script. A script named like a subcommand still runs.
+func dispatch(first string, rest []string) error {
+	if _, err := os.Stat(first); err == nil {
+		return run(first, rest)
+	}
+	switch first {
+	case "init":
+		dir := "."
+		if len(rest) > 0 {
+			dir = rest[0]
+		}
+		server, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		return initFolder(dir, server)
+	case "lsp":
+		return serveLanguage(rest)
+	}
+	return run(first, rest)
 }
 
 // run finds the script's binary in the cache, builds it if it isn't there, and replaces this
