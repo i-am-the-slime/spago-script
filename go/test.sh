@@ -17,7 +17,7 @@ mkdir -p "$OUT"
   echo "go 1.27.0"
   echo
   echo "require ("
-  echo "	github.com/i-am-the-slime/iris-go v0.1.0"
+  echo "	github.com/i-am-the-slime/iris-go v0.1.1"
   echo "	modernc.org/sqlite v1.62.0"
   echo ")"
   if [ -n "${IRIS_GO:-}" ]; then

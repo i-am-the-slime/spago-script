@@ -61,7 +61,7 @@ module spago-script
 go 1.27.0
 
 require (
-	github.com/i-am-the-slime/iris-go v0.1.0
+	github.com/i-am-the-slime/iris-go v0.1.1
 	modernc.org/sqlite v1.62.0
 )
 MOD
