@@ -224,7 +224,7 @@ func writeScript(project string, s script) error {
 func quietly(dir string, program string, args ...string) error {
 	command := exec.Command(program, args...)
 	command.Dir = dir
-	command.Env = append(os.Environ(), "GOFLAGS=-mod=mod")
+	command.Env = append(os.Environ(), "GOFLAGS=-mod=mod -buildvcs=false")
 	output, err := command.CombinedOutput()
 	if err == nil {
 		return nil
