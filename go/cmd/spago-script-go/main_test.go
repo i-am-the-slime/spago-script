@@ -151,3 +151,15 @@ func TestImportsStayAboveTheWrappedMain(t *testing.T) {
 	source := "import Data.Array (length)\nimport Data.String as String\n\ndo\n  log (show (length [ 1, 2, 3 ]))\n  log (String.toUpper \"hi\")\n"
 	expect(t, runScript(t, "imports.purs", source), result{stdout: "3\nHI\n"})
 }
+
+func TestStatementsThenHelpers(t *testing.T) {
+	source := "import Data.Array (length)\n\nnames <- pure [ \"a\", \"b\" ]\nlet count = length names\nlog (greet \"you\")\nlogShow (count + helper)\n\ngreet :: String -> String\ngreet name = \"hi \" <> name\n\nhelper = 1\n"
+	expect(t, runScript(t, "helpers.purs", source), result{stdout: "hi you\n3\n"})
+}
+
+func TestAStatementAfterAHelperIsAnError(t *testing.T) {
+	got := runScript(t, "late.purs", "log \"first\"\n\nhelper = 1\n\nlog \"late\"\n")
+	if got.code == 0 || !strings.Contains(got.stderr, "statements come before helpers") {
+		t.Fatalf("got %+v", got)
+	}
+}

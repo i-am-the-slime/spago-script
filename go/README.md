@@ -4,22 +4,25 @@ PureScript scripts that run as native programs. Same `Script.Prelude` as
 [spago-script](../README.md), compiled to Go with [Iris](https://github.com/i-am-the-slime/purescript-analyzer/tree/iris-go).
 
 ```purescript
-do
-  name <- input "project name"
-  log $ "Hello " <> name
+name <- input "project name"
+log (greet name)
+
+greet :: String -> String
+greet name = "Hello " <> name
 ```
 
-A script that starts with a bare `do` is the body of `main = run do`. Write `main = run do`
-yourself when you'd rather, and put your own imports at the top:
+Write your statements at the top and your helpers below them. The statements become
+`main = run do`, so they run in order; helpers can be used anywhere. Put imports above
+everything:
 
 ```purescript
 import Data.Array (length)
 
-do
-  files <- ls_ @"-1"
-  log files
-  log (show (length [ 1, 2, 3 ]))
+files <- listDir "."
+log (show (length files) <> " files")
 ```
+
+You can also start the script with a bare `do`, or write `main = run do` yourself.
 
 ```sh
 spago-script-go ./hello.purs

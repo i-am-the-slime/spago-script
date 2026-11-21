@@ -30,13 +30,9 @@ const usage = `Usage: spago-script-go <script.purs> [args...]
 Compiles the script to a native binary with Iris and Go, caches it by the
 script's content, and runs it with the arguments.
 
-Scripts without a module header are wrapped as:
-
-  module Main where
-  import Script.Prelude
-
-  main :: Effect Unit
-  <script contents>
+Scripts without a module header are wrapped as a Main module importing
+Script.Prelude. Statements at the top become main = run do; helpers
+(definitions, signatures, data and type declarations) follow them.
 
 Environment:
   IRIS     the iris binary (default: iris on the PATH)
@@ -46,6 +42,19 @@ Environment:
 var moduleHeader = regexp.MustCompile(`(?m)^\s*module\s+([A-Z][\w]*(?:\.[A-Z][\w]*)*)\s+where\b`)
 
 var mainSignature = regexp.MustCompile(`(?m)^\s*main\s*::`)
+
+// mainDefinition finds a script that defines main itself.
+var mainDefinition = regexp.MustCompile(`(?m)^main\b[^=\n]*=`)
+
+// declarationStart is a line at the left margin that begins a declaration: a keyword, a type
+// signature or a definition `name arguments = …` with no `<-` before the `=`.
+var declarationStart = regexp.MustCompile(
+	`^(?:(?:data|type|newtype|class|instance|derive|foreign|infix|infixl|infixr)\b` +
+		`|[a-z_][\w']*\s*::` +
+		`|[a-z_][\w']*(?:\s[^=<\n]*)?\s=(?:\s|$))`)
+
+// keywords begin statements even when the line has an `=`, as in `let x = 1`.
+var keywords = regexp.MustCompile(`^(?:let|if|case|do|when|unless|for_|for)\b`)
 
 func main() {
 	if len(os.Args) < 2 || os.Args[1] == "--help" || os.Args[1] == "-h" {
@@ -73,7 +82,10 @@ func run(scriptPath string, scriptArgs []string) error {
 	if err != nil {
 		return err
 	}
-	script := prepare(string(source))
+	script, err := prepare(string(source))
+	if err != nil {
+		return err
+	}
 	iris, err := irisBinary()
 	if err != nil {
 		return err
@@ -97,14 +109,22 @@ type script struct {
 	source string
 }
 
-func prepare(source string) script {
+func prepare(source string) (script, error) {
 	source = stripShebang(source)
 	if header := moduleHeader.FindStringSubmatch(source); header != nil {
-		return script{module: header[1], source: source}
+		return script{module: header[1], source: source}, nil
 	}
 	imports, body := splitImports(source)
 	if at := bareDo(body); at >= 0 {
 		body = body[:at] + "main = run " + body[at:]
+	} else if !mainDefinition.MatchString(body) {
+		statements, helpers, err := splitStatements(body)
+		if err != nil {
+			return script{}, err
+		}
+		if statements != "" {
+			body = "main = run do\n" + indent(statements) + "\n" + helpers
+		}
 	}
 	annotation := "main :: Effect Unit\n"
 	if mainSignature.MatchString(body) {
@@ -113,7 +133,47 @@ func prepare(source string) script {
 	return script{
 		module: "Main",
 		source: "module Main where\n\nimport Script.Prelude\n" + imports + "\n" + annotation + body,
+	}, nil
+}
+
+// splitStatements separates a script's statements from the helpers after them. Each block starts
+// at the left margin and takes the indented lines below it. Statements come first; from the first
+// declaration on, every block must be a declaration.
+func splitStatements(body string) (string, string, error) {
+	var statements, helpers strings.Builder
+	inHelpers := false
+	declaration := false
+	for _, line := range strings.SplitAfter(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		startsBlock := trimmed != "" && !strings.HasPrefix(trimmed, "--") &&
+			line[0] != ' ' && line[0] != '\t'
+		if startsBlock {
+			declaration = declarationStart.MatchString(line) && !keywords.MatchString(line)
+			if declaration {
+				inHelpers = true
+			} else if inHelpers {
+				return "", "", fmt.Errorf(
+					"statements come before helpers, but this one follows a helper:\n  %s", trimmed)
+			}
+		}
+		if inHelpers {
+			helpers.WriteString(line)
+		} else {
+			statements.WriteString(line)
+		}
 	}
+	return strings.TrimRight(statements.String(), "\n"), helpers.String(), nil
+}
+
+// indent puts every line of a block two spaces to the right, so it becomes a do block's body.
+func indent(block string) string {
+	lines := strings.Split(block, "\n")
+	for index, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			lines[index] = "  " + line
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // splitImports separates the script's own imports, with the comments and blank lines between
