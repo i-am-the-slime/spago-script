@@ -5,3 +5,6 @@
 /.spec-results
 
 /.psci_modules/
+/go/out/
+/go/.spago/
+/go/output/

@@ -1,0 +1,1 @@
+../../../../src/Script/Command/Typed.purs

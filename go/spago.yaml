@@ -1,0 +1,40 @@
+package:
+  name: spago-script-go
+  description: Script.Prelude for PureScript scripts compiled to Go with Iris
+  dependencies:
+    - aff
+    - arrays
+    - control
+    - datetime
+    - effect
+    - either
+    - exceptions
+    - foldable-traversable
+    - foreign
+    - foreign-object
+    - golang
+    - integers
+    - lists
+    - maybe
+    - newtype
+    - prelude
+    - record
+    - refs
+    - strings
+    - tailrec
+    - transformers
+    - tuples
+    - typelevel-prelude
+    - yoga-format
+    - yoga-json
+    - yoga-om
+  test:
+    main: Test.Main
+    dependencies:
+      - spec
+workspace:
+  packageSet:
+    registry: 77.9.0
+  extraPackages:
+    golang:
+      path: ../../purescript-golang
