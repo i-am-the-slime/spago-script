@@ -8,3 +8,5 @@
 /go/out/
 /go/.spago/
 /go/output/
+/go/bin/
+/go/cmd/spago-script-go/bundle/

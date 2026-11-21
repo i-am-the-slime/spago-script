@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Runs the prompt tests of test/pty against spago-script-go instead of the Bun runner.
+#
+#   go/test/pty/run [RUNNER]    # default: go/bin/spago-script-go
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+RUNNER="${1:-$ROOT/go/bin/spago-script-go}"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+cd "$ROOT"
+grep -E '^expect test/pty/' test/pty/run | while read -r _ expectation script; do
+  sed "s|/Users/mark/code/spago-script/bin/spago-script.js|$RUNNER|" "$expectation" >"$WORK/$(basename "$expectation")"
+  echo "== $(basename "$expectation") $(basename "$script")"
+  expect "$WORK/$(basename "$expectation")" "$script" >"$WORK/log" 2>&1 || {
+    cat "$WORK/log"
+    echo "FAILED: $expectation $script"
+    exit 1
+  }
+done
+echo "all prompt tests passed"
