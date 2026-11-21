@@ -1770,18 +1770,18 @@ goCommand executable arguments options =
 -- | What execa reports for a program that ran to its end.
 toResult :: String -> Array String -> ExecaOptions -> Exec.Output -> ExecaResult
 toResult executable arguments options output = do
-  let exit = if output.signal == "" then Normally (un ExitCode output.exitCode) else BySignal (KillSignal output.signal)
+  let ended = if output.signal == "" then Normally (un ExitCode output.exitCode) else BySignal (KillSignal output.signal)
   let stdout = strip output.stdout
   let stderr = strip output.stderr
-  let shortMessage = failure exit
+  let shortMessage = failure ended
   { message: String.joinWith "\n" $ Array.filter (_ /= "") [ shortMessage, stderr, stdout ]
   , shortMessage
   , escapedCommand
-  , exit
-  , exitCode: case exit of
+  , exit: ended
+  , exitCode: case ended of
       Normally code -> Just code
       BySignal _ -> Nothing
-  , signal: case exit of
+  , signal: case ended of
       Normally _ -> Nothing
       BySignal signal -> Just signal
   , stdout

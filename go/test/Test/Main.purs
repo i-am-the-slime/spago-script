@@ -7,7 +7,8 @@ import Data.Identity (Identity(..))
 import Data.Newtype (un)
 import Data.String.CodeUnits as String.CodeUnits
 import Effect.Aff (Aff, attempt, bracket)
-import Effect.Exception (error, message, throwException)
+import Effect.Exception (message, throwException)
+import Effect.Exception as Exception
 import Foreign.Object as Object
 import Go.Net.HTTP (Address(..), HeaderName(..), HeaderValue(..), Path(..), Status(..))
 import Go.Net.HTTP as HTTP
@@ -292,7 +293,7 @@ withServer :: (String -> Aff Unit) -> Aff Unit
 withServer test = bracket started HTTP.shutdown \server ->
   test ("http://" <> un Address (HTTP.serverAddress server))
   where
-  started = HTTP.start (Address "127.0.0.1:0") answer # liftEffect >>= either (throwException <<< error <<< show) pure # liftEffect
+  started = HTTP.start (Address "127.0.0.1:0") answer # liftEffect >>= either (throwException <<< Exception.error <<< show) pure # liftEffect
 
   answer request = case HTTP.path request of
     Path "/echo" -> do

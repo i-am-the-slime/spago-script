@@ -62,7 +62,6 @@ derive newtype instance Show URL
 
 newtype Method = Method String
 
-derive instance Newtype Method _
 derive newtype instance Eq Method
 derive newtype instance Show Method
 
@@ -120,11 +119,13 @@ fetch address given = do
   options = Record.merge given { method: getMethod, headers: Object.empty :: Headers, body: "" }
 
   request =
-    { method: HTTP.Method (un Method options.method)
+    { method: HTTP.Method (methodName options.method)
     , url: HTTP.URL (un URL address)
     , headers: Object.toArrayWithKey toHeader options.headers
     , body: options.body
     }
+
+  methodName (Method name) = name
 
   toHeader name value = { name: HeaderName name, value: HeaderValue value }
 

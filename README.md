@@ -36,6 +36,9 @@ bun add -g github:i-am-the-slime/spago-script
 spago-script ./script.purs
 ```
 
+Want a native binary instead of Bun? [spago-script-go](go/README.md) runs the same scripts
+compiled to Go.
+
 ## Shebang scripts
 
 Make a file executable:
