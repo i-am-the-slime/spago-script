@@ -1,6 +1,5 @@
 module Script.Command.Grammars where
 
-import Prim (Symbol)
 import Script.Command.Grammar
   ( AddOption
   , AddPositional

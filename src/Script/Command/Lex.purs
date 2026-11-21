@@ -54,7 +54,6 @@ import Prelude ((<>))
 
 import Data.Array as Array
 import Data.Symbol (class IsSymbol, reflectSymbol)
-import Prim (Array, Boolean, Constraint, Record, Row, String, Symbol, Type)
 import Prim.Boolean (False, True)
 import Prim.Row as Row
 import Prim.Symbol as Symbol

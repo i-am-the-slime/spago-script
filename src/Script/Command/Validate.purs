@@ -1,6 +1,5 @@
 module Script.Command.Validate where
 
-import Prim (Boolean, Char, Constraint, Int, Number, Record, Row, String, Symbol, Type)
 import Prim.Boolean (False, True)
 import Prim.Row as Row
 import Prim.Symbol as Symbol

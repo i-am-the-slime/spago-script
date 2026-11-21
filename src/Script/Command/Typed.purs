@@ -7,7 +7,6 @@ module Script.Command.Typed
   , typedCommand
   ) where
 
-import Prim (Array, Constraint, String, Symbol, Type)
 import Data.Symbol (class IsSymbol, reflectSymbol)
 import Script.Command.Grammar (Command, Grammar)
 import Script.Command.Lex (class LexTemplate, class RenderTokens, renderTokens)

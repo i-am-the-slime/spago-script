@@ -32,7 +32,6 @@ module Script.Command.Grammar
   , AddSubcommand
   ) where
 
-import Prim (Symbol)
 
 
 data ValueKind
