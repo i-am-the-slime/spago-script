@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// These tests run the real binary, Iris and Go. Run ../../build.sh first, so the bundle exists.
+// These tests run the real binary, Iris and Go. Run the build task (Tasks.Build) first, so the bundle exists.
 
 var binary string
 

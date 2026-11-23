@@ -19,7 +19,7 @@ import (
 )
 
 // bundle holds Script.Prelude for Go and the packages it needs that aren't on the registry, as
-// build.sh copies them, plus the Go module the script compiles into. That one is go.mod.template,
+// the build task (Tasks.Build) copies them, plus the Go module the script compiles into. That one is go.mod.template,
 // because embed leaves out directories with a go.mod.
 //
 //go:embed all:bundle

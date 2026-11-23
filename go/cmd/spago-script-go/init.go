@@ -87,13 +87,31 @@ func writeManifest(dir string, project string) error {
 func manifest(project string) string {
 	scriptsManifest, err := bundle.ReadFile("bundle/spago.yaml")
 	if err != nil {
-		panic("the bundle has no spago.yaml; run build.sh")
+		panic("the bundle has no spago.yaml; build spago-script-go with its build task")
+	}
+	var extraPackages strings.Builder
+	extraPackages.WriteString("  extraPackages:\n")
+	extraPackages.WriteString("    spago-script-go:\n      path: " + filepath.Join(project, "prelude") + "\n")
+	for _, name := range bundledPackages() {
+		extraPackages.WriteString("    " + name + ":\n      path: " + filepath.Join(project, "packages", name) + "\n")
 	}
 	return manifestMarker + "; run it again after updating spago-script-go.\n" +
 		strings.Replace(string(scriptsManifest), "name: script\n", "name: scripts\n", 1) +
-		"  extraPackages:\n" +
-		"    spago-script-go:\n      path: " + filepath.Join(project, "prelude") + "\n" +
-		"    golang:\n      path: " + filepath.Join(project, "golang") + "\n"
+		extraPackages.String()
+}
+
+// bundledPackages are the packages besides the prelude that the bundle brings along, such as
+// purescript-go's go-os and go-exec.
+func bundledPackages() []string {
+	entries, err := bundle.ReadDir("bundle/packages")
+	if err != nil {
+		panic("the bundle has no packages; build spago-script-go with its build task")
+	}
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names
 }
 
 type rename struct {

@@ -1,0 +1,15 @@
+package:
+  name: spago-script-go-tasks
+  description: Builds and tests spago-script-go
+  dependencies:
+    - arrays
+    - foldable-traversable
+    - maybe
+    - prelude
+    - spago-script-go
+    - strings
+    - tuples
+  test:
+    main: Test.Tasks.Main
+    dependencies:
+      - spec

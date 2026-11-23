@@ -43,10 +43,12 @@ The first run of a script compiles it, which takes a second or two. After that i
 ```sh
 git clone https://github.com/i-am-the-slime/spago-script
 cd spago-script/go
-./build.sh ~/.local/bin/spago-script-go
+iris run --go -p spago-script-go-tasks --entry Tasks.Build.main -- ~/.local/bin/spago-script-go
 ```
 
-That's one binary with the prelude inside. Compiled scripts live in
+That's one binary with the prelude inside. The build itself is a PureScript program, in `tasks`.
+Set `PURESCRIPT_GO` to a [purescript-go](https://github.com/i-am-the-slime/purescript-go) checkout
+to bundle its packages from there instead of the commit `spago.yaml` pins. Compiled scripts live in
 `~/.cache/spago-script-go` (or `$XDG_CACHE_HOME/spago-script-go`). Delete its `bin` folder
 whenever you like, scripts just compile again.
 
@@ -164,10 +166,39 @@ main = run do
 
 Files open read-only.
 
+## Helpers
+
+A few more modules for the things scripts keep doing. Import what you need:
+
+| Module | |
+| --- | --- |
+| `Script.Files` | `filesUnder` and `filesEndingWith` walk a directory, `copyTree` copies one, `readJSONFile` and `writeJSONFile` |
+| `Script.Environment` | `setEnv`, `unsetEnv`, `setEnvUnlessSet` (that's `export X=${X:-value}`), `envOr` |
+| `Script.Text` | `substitute` (a `sed s|…|…|g` without regular expressions), `linesOf`, `trimEnd`, `padLeft`, `padRight` |
+| `Script.Table` | `markdownTable` and `alignedTable` |
+| `Script.Statistics` | `median` and `percentOf` |
+| `Script.Timing` | `timed` an action, or `timedRuns` with warmups |
+| `Script.Hyperfine` | runs commands with [hyperfine](https://github.com/sharkdp/hyperfine) and hands back every run, with medians |
+
+```purescript
+import Script.Hyperfine (defaultBenchmark, hyperfine)
+import Script.Table (alignedTable)
+
+results <- hyperfine defaultBenchmark { commands = [ "sleep 0.1", "sleep 0.2" ] }
+log (alignedTable [ "command", "median" ] (results <#> \r -> [ r.command, show r.medianWallSeconds ]))
+```
+
+```
+command    median
+sleep 0.1  0.104…
+sleep 0.2  0.205…
+```
+
 ## Go's standard library
 
-Write a module header and import the Go bindings (`Go.OS`, `Go.OS.Exec`, `Go.Net.HTTP`,
-`Go.Path.Filepath`, `Go.Time`, …) for anything the prelude doesn't have:
+Write a module header and import the Go bindings from
+[purescript-go](https://github.com/i-am-the-slime/purescript-go) (`Go.OS`, `Go.OS.Exec`,
+`Go.Net.HTTP`, `Go.Path.Filepath`, `Go.Time`, `Go.IO`, …) for anything the prelude doesn't have:
 
 ```purescript
 module Main where
@@ -199,7 +230,7 @@ main = run do
 ## Testing
 
 ```sh
-./test.sh
+iris run --go -p spago-script-go-tasks --entry Tasks.Test.main
 ```
 
 runs the prelude's specs, the CLI tests and the prompt tests.

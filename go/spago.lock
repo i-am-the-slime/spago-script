@@ -44,6 +44,25 @@
             "spec"
           ]
         }
+      },
+      "spago-script-go-tasks": {
+        "path": "tasks",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "foldable-traversable",
+            "maybe",
+            "prelude",
+            "spago-script-go",
+            "strings",
+            "tuples"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "spec"
+          ]
+        }
       }
     },
     "package_set": {
