@@ -128,7 +128,12 @@ func run(scriptPath string, scriptArgs []string) error {
 			return err
 		}
 	}
-	return syscall.Exec(binary, append([]string{scriptPath}, scriptArgs...), os.Environ())
+	absoluteScript, err := filepath.Abs(scriptPath)
+	if err != nil {
+		return err
+	}
+	environment := append(os.Environ(), "SPAGO_SCRIPT_PATH="+absoluteScript)
+	return syscall.Exec(binary, append([]string{scriptPath}, scriptArgs...), environment)
 }
 
 // script is a script as Iris compiles it: a module, and the name it goes by.

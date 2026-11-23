@@ -74,6 +74,23 @@ func TestRunsAScriptWithItsArguments(t *testing.T) {
 	expect(t, got, result{stdout: "[\"one\",\"two words\"]\n"})
 }
 
+func TestTellsTheScriptWhereItLives(t *testing.T) {
+	directory := t.TempDir()
+	script := filepath.Join(directory, "where.purs")
+	source := "import Script.Files (scriptDirectory)\n\nmain = run do\n  log =<< scriptDirectory\n"
+	if err := os.WriteFile(script, []byte(source), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := runFile(t, script)
+	if got.stdout != directory+"\n" && got.stdout != resolved+"\n" {
+		t.Fatalf("got %+v, want the directory %s", got, directory)
+	}
+}
+
 func TestPassesTheExitCodeThrough(t *testing.T) {
 	got := runScript(t, "exit.purs", "main = run do\n  log \"leaving\"\n  exit 3 # liftEffect\n")
 	expect(t, got, result{code: 3, stdout: "leaving\n"})

@@ -172,7 +172,7 @@ A few more modules for the things scripts keep doing. Import what you need:
 
 | Module | |
 | --- | --- |
-| `Script.Files` | `filesUnder` and `filesEndingWith` walk a directory, `copyTree` copies one, `readJSONFile` and `writeJSONFile` |
+| `Script.Files` | `filesUnder` and `filesEndingWith` walk a directory, `copyTree` copies one, `readJSONFile` and `writeJSONFile`, `scriptDirectory` (that's `$(dirname "$0")`), `changeDirectory` |
 | `Script.Environment` | `setEnv`, `unsetEnv`, `setEnvUnlessSet` (that's `export X=${X:-value}`), `envOr` |
 | `Script.Text` | `substitute` (a `sed s|…|…|g` without regular expressions), `linesOf`, `trimEnd`, `padLeft`, `padRight` |
 | `Script.Table` | `markdownTable` and `alignedTable` |

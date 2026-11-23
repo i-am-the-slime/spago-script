@@ -9,7 +9,7 @@ import Data.String.CodeUnits as CodeUnits
 import Data.Tuple.Nested ((/\))
 import Effect.Ref as Ref
 import Script.Environment (envOr, setEnv, setEnvUnlessSet, unsetEnv)
-import Script.Files (absolutePath, copyTree, filesEndingWith, filesUnder, readJSONFile, writeJSONFile)
+import Script.Files (absolutePath, changeDirectory, copyTree, filesEndingWith, filesUnder, readJSONFile, scriptDirectory, writeJSONFile)
 import Script.Hyperfine (defaultBenchmark, hyperfine, measuredFrom)
 import Script.Statistics (median, percentOf)
 import Script.Table (alignedTable, markdownTable)
@@ -62,6 +62,23 @@ filesSpec = describe "Script.Files" do
     absolute <- absolutePath "relative/file"
     here <- cwd # liftEffect
     absolute `shouldEqual` (here / "relative/file")
+
+  it "changes the current directory" do
+    before <- cwd # liftEffect
+    changeDirectory tree
+    inside <- cwd # liftEffect
+    changeDirectory before
+    inside `shouldEqual` (before / tree)
+
+  it "knows the directory of the script spago-script-go started" do
+    unsetEnv "SPAGO_SCRIPT_PATH"
+    here <- cwd # liftEffect
+    unstarted <- scriptDirectory
+    setEnv "SPAGO_SCRIPT_PATH" "/home/ada/scripts/tidy.purs"
+    started <- scriptDirectory
+    unsetEnv "SPAGO_SCRIPT_PATH"
+    unstarted `shouldEqual` here
+    started `shouldEqual` "/home/ada/scripts"
   where
   tree = "output/script-helpers-test/tree"
   copied = "output/script-helpers-test/copied"

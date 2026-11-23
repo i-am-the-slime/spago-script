@@ -5,6 +5,8 @@ module Script.Files
   , readJSONFile
   , writeJSONFile
   , absolutePath
+  , changeDirectory
+  , scriptDirectory
   ) where
 
 import Script.Prelude
@@ -19,6 +21,7 @@ import Data.Traversable (for)
 import Effect.Aff (throwError)
 import Effect.Exception (error)
 import Go.FilePath as Go
+import Go.OS as OS
 import Go.Path.Filepath as Filepath
 import Yoga.JSON.Error (renderHumanError)
 
@@ -62,6 +65,21 @@ readJSONFile path = do
 -- | Writes a value as JSON, indented by two spaces, with a final newline.
 writeJSONFile :: forall m a. MonadAff m => WriteForeign a => FilePath -> a -> m Unit
 writeJSONFile path value = write path (writePrettyJSON 2 value <> "\n")
+
+-- | Makes the directory the current one, for the script and the programs it starts, as `cd` does.
+changeDirectory :: forall m. MonadAff m => FilePath -> m Unit
+changeDirectory path = do
+  changed <- OS.chdir (Go.FilePath path) # liftEffect
+  either (\_ -> throwError (error ("can't change to " <> path)) # liftAff) pure changed
+
+-- | The directory the running script is in, as `$(dirname "$0")`, made absolute; the current
+-- | directory when the script wasn't started by spago-script-go.
+scriptDirectory :: forall m. MonadEffect m => m FilePath
+scriptDirectory = do
+  script <- lookupEnv "SPAGO_SCRIPT_PATH" # liftEffect
+  case script of
+    Just path -> pure (un Go.FilePath (Filepath.dir (Go.FilePath path)))
+    Nothing -> cwd # liftEffect
 
 -- | The path made absolute against the current directory.
 absolutePath :: forall m. MonadEffect m => FilePath -> m FilePath
