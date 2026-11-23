@@ -5,23 +5,21 @@ import (
 	"errors"
 	"net/url"
 
-	"github.com/i-am-the-slime/iris-go/aff"
+	"github.com/i-am-the-slime/iris-go/eventloop"
 	_ "modernc.org/sqlite"
 )
 
 // QuerySQLiteTextImpl queries on a goroutine of its own and hands the text, or the reason there is
-// none, to finished on the event loop.
+// none, to finished, an IO action, from that goroutine. Until then it keeps the program running.
 func QuerySQLiteTextImpl[R any](failed func(string) R, found func(string) R, path string, query string, finished func(R)) {
-	retire := aff.Hold()
+	retire := eventloop.Hold()
 	go func() {
 		text, err := queryText(path, query)
-		aff.Exclusive(func() {
-			if err != nil {
-				finished(failed(err.Error()))
-			} else {
-				finished(found(text))
-			}
-		})
+		if err != nil {
+			finished(failed(err.Error()))
+		} else {
+			finished(found(text))
+		}
 		retire()
 	}()
 }

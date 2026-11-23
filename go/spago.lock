@@ -15,7 +15,12 @@
             "foldable-traversable",
             "foreign",
             "foreign-object",
-            "golang",
+            "go-bytes",
+            "go-exec",
+            "go-http",
+            "go-io",
+            "go-os",
+            "go-time",
             "integers",
             "lists",
             "maybe",
@@ -37,6 +42,17 @@
           "dependencies": [
             "spec"
           ]
+        }
+      },
+      "spago-script-go-tasks": {
+        "path": "tasks",
+        "core": {
+          "dependencies": [
+            "spago-script-go"
+          ]
+        },
+        "test": {
+          "dependencies": []
         }
       }
     },
@@ -688,8 +704,35 @@
       }
     },
     "extra_packages": {
-      "golang": {
-        "path": "../../purescript-golang"
+      "go-bytes": {
+        "git": "https://github.com/i-am-the-slime/purescript-go.git",
+        "ref": "353775e4356f0146917c3b0ace5a99d489009190",
+        "subdir": "packages/go-bytes"
+      },
+      "go-exec": {
+        "git": "https://github.com/i-am-the-slime/purescript-go.git",
+        "ref": "353775e4356f0146917c3b0ace5a99d489009190",
+        "subdir": "packages/go-exec"
+      },
+      "go-http": {
+        "git": "https://github.com/i-am-the-slime/purescript-go.git",
+        "ref": "353775e4356f0146917c3b0ace5a99d489009190",
+        "subdir": "packages/go-http"
+      },
+      "go-io": {
+        "git": "https://github.com/i-am-the-slime/purescript-go.git",
+        "ref": "353775e4356f0146917c3b0ace5a99d489009190",
+        "subdir": "packages/go-io"
+      },
+      "go-os": {
+        "git": "https://github.com/i-am-the-slime/purescript-go.git",
+        "ref": "353775e4356f0146917c3b0ace5a99d489009190",
+        "subdir": "packages/go-os"
+      },
+      "go-time": {
+        "git": "https://github.com/i-am-the-slime/purescript-go.git",
+        "ref": "353775e4356f0146917c3b0ace5a99d489009190",
+        "subdir": "packages/go-time"
       }
     }
   },
@@ -1066,13 +1109,59 @@
         "unfoldable"
       ]
     },
-    "golang": {
-      "type": "local",
-      "path": "../../purescript-golang",
+    "go-bytes": {
+      "type": "git",
+      "url": "https://github.com/i-am-the-slime/purescript-go.git",
+      "rev": "353775e4356f0146917c3b0ace5a99d489009190",
+      "subdir": "packages/go-bytes",
+      "dependencies": [
+        "newtype",
+        "prelude"
+      ]
+    },
+    "go-exec": {
+      "type": "git",
+      "url": "https://github.com/i-am-the-slime/purescript-go.git",
+      "rev": "353775e4356f0146917c3b0ace5a99d489009190",
+      "subdir": "packages/go-exec",
+      "dependencies": [
+        "aff",
+        "bifunctors",
+        "effect",
+        "either",
+        "go-io",
+        "go-os",
+        "maybe",
+        "newtype",
+        "prelude",
+        "tuples"
+      ]
+    },
+    "go-http": {
+      "type": "git",
+      "url": "https://github.com/i-am-the-slime/purescript-go.git",
+      "rev": "353775e4356f0146917c3b0ace5a99d489009190",
+      "subdir": "packages/go-http",
+      "dependencies": [
+        "aff",
+        "effect",
+        "either",
+        "go-bytes",
+        "go-io",
+        "maybe",
+        "newtype",
+        "prelude"
+      ]
+    },
+    "go-io": {
+      "type": "git",
+      "url": "https://github.com/i-am-the-slime/purescript-go.git",
+      "rev": "353775e4356f0146917c3b0ace5a99d489009190",
+      "subdir": "packages/go-io",
       "dependencies": [
         "aff",
         "arrays",
-        "bifunctors",
+        "control",
         "datetime",
         "effect",
         "either",
@@ -1080,11 +1169,46 @@
         "foldable-traversable",
         "maybe",
         "newtype",
-        "partial",
+        "parallel",
         "prelude",
         "tailrec",
         "transformers",
         "tuples"
+      ]
+    },
+    "go-os": {
+      "type": "git",
+      "url": "https://github.com/i-am-the-slime/purescript-go.git",
+      "rev": "353775e4356f0146917c3b0ace5a99d489009190",
+      "subdir": "packages/go-os",
+      "dependencies": [
+        "aff",
+        "datetime",
+        "effect",
+        "either",
+        "exceptions",
+        "go-bytes",
+        "go-io",
+        "maybe",
+        "newtype",
+        "partial",
+        "prelude"
+      ]
+    },
+    "go-time": {
+      "type": "git",
+      "url": "https://github.com/i-am-the-slime/purescript-go.git",
+      "rev": "353775e4356f0146917c3b0ace5a99d489009190",
+      "subdir": "packages/go-time",
+      "dependencies": [
+        "datetime",
+        "effect",
+        "either",
+        "go-io",
+        "maybe",
+        "newtype",
+        "partial",
+        "prelude"
       ]
     },
     "heterogeneous": {
