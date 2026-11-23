@@ -23,6 +23,7 @@ package:
     - maybe
     - newtype
     - now
+    - numbers
     - prelude
     - record
     - refs

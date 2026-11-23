@@ -4,6 +4,7 @@ module Script.Text
   , trimEnd
   , padLeft
   , padRight
+  , decimals
   ) where
 
 import Prelude
@@ -11,6 +12,7 @@ import Prelude
 import Data.Array as Array
 import Data.Foldable (foldl)
 import Data.Maybe (Maybe(..))
+import Data.Number.Format as Number
 import Data.String (Pattern(..), Replacement(..))
 import Data.String as String
 import Data.String.CodeUnits as CodeUnits
@@ -46,6 +48,10 @@ padLeft width text = blanks (width - String.length text) <> text
 -- | The text with blanks after it, so it is at least that wide, for left-aligned columns.
 padRight :: Int -> String -> String
 padRight width text = text <> blanks (width - String.length text)
+
+-- | The number with exactly that many digits after the point, as JavaScript's `toFixed`.
+decimals :: Int -> Number -> String
+decimals digits = Number.toStringWith (Number.fixed digits)
 
 blanks :: Int -> String
 blanks count = CodeUnits.fromCharArray (Array.replicate count ' ')

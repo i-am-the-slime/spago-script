@@ -174,7 +174,8 @@ A few more modules for the things scripts keep doing. Import what you need:
 | --- | --- |
 | `Script.Files` | `filesUnder` and `filesEndingWith` walk a directory, `copyTree` copies one, `readJSONFile` and `writeJSONFile`, `scriptDirectory` (that's `$(dirname "$0")`), `changeDirectory` |
 | `Script.Environment` | `setEnv`, `unsetEnv`, `setEnvUnlessSet` (that's `export X=${X:-value}`), `envOr` |
-| `Script.Text` | `substitute` (a `sed s|…|…|g` without regular expressions), `linesOf`, `trimEnd`, `padLeft`, `padRight` |
+| `Script.Text` | `substitute` (a `sed s|…|…|g` without regular expressions), `linesOf`, `trimEnd`, `padLeft`, `padRight`, `decimals` (that's `toFixed`) |
+| `Script.Baseline` | keep scores in a JSON file and `judge` new ones against them: `Regressed`, `Improved`, `Steady` or `New` |
 | `Script.Table` | `markdownTable` and `alignedTable` |
 | `Script.Statistics` | `median` and `percentOf` |
 | `Script.Timing` | `timed` an action, or `timedRuns` with warmups |

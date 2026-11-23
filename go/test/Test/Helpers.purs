@@ -13,7 +13,9 @@ import Script.Files (absolutePath, changeDirectory, copyTree, filesEndingWith, f
 import Script.Hyperfine (defaultBenchmark, hyperfine, measuredFrom)
 import Script.Statistics (median, percentOf)
 import Script.Table (alignedTable, markdownTable)
-import Script.Text (linesOf, padLeft, padRight, substitute, trimEnd)
+import Script.Text (decimals, linesOf, padLeft, padRight, substitute, trimEnd)
+import Script.Baseline (Verdict(..), judge, readBaseline, writeBaseline)
+import Foreign.Object as Object
 import Script.Timing (timed, timedRuns)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldSatisfy)
@@ -27,6 +29,26 @@ helpers = describe "helpers" do
   tableSpec
   timingSpec
   hyperfineSpec
+  baselineSpec
+
+baselineSpec :: Spec Unit
+baselineSpec = describe "Script.Baseline" do
+  it "judges a score against the baseline's, higher is better" do
+    judge 0.1 baseline "nqueens" 85.0 `shouldEqual` Regressed
+    judge 0.1 baseline "nqueens" 95.0 `shouldEqual` Steady
+    judge 0.1 baseline "nqueens" 115.0 `shouldEqual` Improved
+    judge 0.1 baseline "cfold" 50.0 `shouldEqual` New
+
+  it "keeps the baseline in a file, and starts empty without one" do
+    removeFile file
+    missing <- readBaseline file
+    writeBaseline file baseline
+    kept <- readBaseline file
+    missing `shouldEqual` Object.empty
+    kept `shouldEqual` baseline
+  where
+  baseline = Object.singleton "nqueens" 100.0
+  file = "output/script-helpers-test/baseline.json"
 
 filesSpec :: Spec Unit
 filesSpec = describe "Script.Files" do
@@ -112,6 +134,10 @@ textSpec = describe "Script.Text" do
 
   it "trims the end only" do
     trimEnd "  text \n\t" `shouldEqual` "  text"
+
+  it "writes numbers with a fixed number of decimals" do
+    decimals 2 3.14159 `shouldEqual` "3.14"
+    decimals 0 104.4 `shouldEqual` "104"
 
   it "pads to a width" do
     padLeft 5 "42" `shouldEqual` "   42"
