@@ -12,6 +12,7 @@ import Effect.Exception as Exception
 import Foreign.Object as Object
 import Go.Net.HTTP (Address(..), HeaderName(..), HeaderValue(..), Path(..), Status(..))
 import Go.Net.HTTP as HTTP
+import Test.Helpers (helpers)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter.Console (consoleReporter)
@@ -34,6 +35,7 @@ specs = describe "Script.Prelude on Go" do
   sqlite
   fetching
   cookies
+  helpers
 
 files :: Spec Unit
 files = describe "files" do

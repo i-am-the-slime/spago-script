@@ -25,6 +25,7 @@
             "lists",
             "maybe",
             "newtype",
+            "now",
             "prelude",
             "record",
             "refs",
@@ -42,17 +43,6 @@
           "dependencies": [
             "spec"
           ]
-        }
-      },
-      "spago-script-go-tasks": {
-        "path": "tasks",
-        "core": {
-          "dependencies": [
-            "spago-script-go"
-          ]
-        },
-        "test": {
-          "dependencies": []
         }
       }
     },
