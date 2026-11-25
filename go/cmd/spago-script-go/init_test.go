@@ -96,7 +96,7 @@ func TestTheLanguageServerChecksScripts(t *testing.T) {
 	if got := server.diagnostics(t, "hello.purs"); len(got) != 0 {
 		t.Fatalf("a correct script with a shebang has diagnostics: %v", got)
 	}
-	if got := server.diagnostics(t, "broken.purs"); len(got) != 1 || !strings.Contains(got[0], "Cannot unify 'Int' with 'String'") {
+	if got := server.diagnostics(t, "broken.purs"); len(got) != 1 || !strings.Contains(got[0], "Could not match 'Int' with 'String'") {
 		t.Fatalf("got %v", got)
 	}
 	if got := server.hover(t, "hello.purs", 7, 3); !strings.Contains(got, "log ::") {
