@@ -1,7 +1,7 @@
 # spago-script-go
 
 PureScript scripts that run as native programs. Same `Script.Prelude` as
-[spago-script](../README.md), compiled to Go with [Iris](https://github.com/i-am-the-slime/purescript-analyzer/tree/iris-go).
+[spago-script](../README.md), compiled to Go with [googoo](https://github.com/i-am-the-slime/iris-go-backend).
 
 ```purescript
 name <- input "project name"
@@ -33,7 +33,7 @@ The first run of a script compiles it, which takes a second or two. After that i
 
 ## Requirements
 
-- Iris with the Go backend, on your `PATH` or in `IRIS`.
+- [googoo](https://github.com/i-am-the-slime/iris-go-backend), on your `PATH` or in `IRIS`.
 - Go. It downloads the toolchain it needs by itself.
 - Network access on the first run, to download PureScript and Go packages.
 - Whatever programs your script calls, such as `git`, `rg` or `gum`.
@@ -43,7 +43,7 @@ The first run of a script compiles it, which takes a second or two. After that i
 ```sh
 git clone https://github.com/i-am-the-slime/spago-script
 cd spago-script/go
-iris run --go -p spago-script-go-tasks --entry Tasks.Build.main -- ~/.local/bin/spago-script-go
+googoo run --go -p spago-script-go-tasks --entry Tasks.Build.main -- ~/.local/bin/spago-script-go
 ```
 
 That's one binary with the prelude inside. The build itself is a PureScript program, in `tasks`.
@@ -231,7 +231,7 @@ main = run do
 ## Testing
 
 ```sh
-iris run --go -p spago-script-go-tasks --entry Tasks.Test.main
+googoo run --go -p spago-script-go-tasks --entry Tasks.Test.main
 ```
 
 runs the prelude's specs, the CLI tests and the prompt tests.

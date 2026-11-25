@@ -27,9 +27,9 @@ var bundle embed.FS
 
 const usage = `Usage: spago-script-go <script.purs> [args...]
        spago-script-go init [DIR]
-       spago-script-go lsp [iris lsp flags...]
+       spago-script-go lsp [googoo lsp flags...]
 
-Compiles the script to a native binary with Iris and Go, caches it by the
+Compiles the script to a native binary with googoo and Go, caches it by the
 script's content, and runs it with the arguments.
 
 init makes DIR (default: the current directory) a script folder for your
@@ -42,7 +42,7 @@ Script.Prelude. Statements at the top become main = run do; helpers
 (definitions, signatures, data and type declarations) follow them.
 
 Environment:
-  IRIS     the iris binary (default: iris on the PATH)
+  IRIS     the googoo binary (default: googoo on the PATH, or iris, its old name)
   IRIS_GO  a local checkout of github.com/i-am-the-slime/iris-go to build against
 `
 
@@ -386,20 +386,32 @@ type irisInfo struct {
 	stamp string
 }
 
+// irisBinary is IRIS, or else googoo on the PATH, or else iris, googoo's old name.
 func irisBinary() (irisInfo, error) {
-	name := os.Getenv("IRIS")
-	if name == "" {
-		name = "iris"
+	names := []string{"googoo", "iris"}
+	if given := os.Getenv("IRIS"); given != "" {
+		names = []string{given}
 	}
-	path, err := exec.LookPath(name)
+	path, err := lookPathFirst(names)
 	if err != nil {
-		return irisInfo{}, fmt.Errorf("can't find Iris (%s); install it or point IRIS at it", name)
+		return irisInfo{}, fmt.Errorf("can't find googoo (%s); install it or point IRIS at it", strings.Join(names, " or "))
 	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return irisInfo{}, err
 	}
 	return irisInfo{path: path, stamp: fmt.Sprintf("%s %d %d", path, info.Size(), info.ModTime().UnixNano())}, nil
+}
+
+func lookPathFirst(names []string) (string, error) {
+	var err error
+	for _, name := range names {
+		var path string
+		if path, err = exec.LookPath(name); err == nil {
+			return path, nil
+		}
+	}
+	return "", err
 }
 
 func cacheDir() (string, error) {

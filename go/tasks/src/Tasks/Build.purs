@@ -1,7 +1,7 @@
 -- | Builds the spago-script-go binary with Script.Prelude for Go and purescript-go's packages
 -- | inside. Run it in spago-script's go directory:
 -- |
--- |   iris run --go -p spago-script-go-tasks --entry Tasks.Build.main -- [OUTPUT]
+-- |   googoo run --go -p spago-script-go-tasks --entry Tasks.Build.main -- [OUTPUT]
 -- |
 -- | OUTPUT defaults to bin/spago-script-go. `PURESCRIPT_GO` may name a local purescript-go
 -- | checkout to take the packages from instead of the commit spago.yaml pins.
@@ -107,9 +107,9 @@ scriptsGoModule = String.joinWith "\n"
   , ""
   ]
 
--- | The iris-go runtime the Go that Iris writes needs.
+-- | The iris-go runtime the Go that googoo writes needs.
 irisGoVersion :: String
-irisGoVersion = "v0.3.0"
+irisGoVersion = "v0.7.0"
 
 directoryOf :: FilePath -> FilePath
 directoryOf path = fromMaybe "." (String.lastIndexOf (Pattern "/") path <#> \at -> String.take at path)

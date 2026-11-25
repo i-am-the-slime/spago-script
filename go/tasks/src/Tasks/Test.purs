@@ -1,7 +1,7 @@
 -- | Runs the Go flavour's tests: the Script.Prelude specs, the CLI tests and the prompt tests.
 -- | Run it in spago-script's go directory:
 -- |
--- |   iris run --go -p spago-script-go-tasks --entry Tasks.Test.main
+-- |   googoo run --go -p spago-script-go-tasks --entry Tasks.Test.main
 -- |
 -- | `IRIS` names the iris binary, `IRIS_GO` a local iris-go checkout to build against.
 module Tasks.Test (main) where
@@ -21,7 +21,7 @@ import Tasks.Build (buildSpagoScriptGo, irisGoVersion)
 
 main :: Effect Unit
 main = run do
-  iris <- envOr "IRIS" "iris"
+  iris <- envOr "IRIS" "googoo"
   log "== Script.Prelude specs"
   preludeSpecs iris
   log "== CLI"
