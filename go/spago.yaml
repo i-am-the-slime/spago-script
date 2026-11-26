@@ -45,25 +45,25 @@ workspace:
   extraPackages:
     go-bytes:
       git: https://github.com/i-am-the-slime/purescript-go.git
-      ref: 353775e4356f0146917c3b0ace5a99d489009190
+      ref: v0.3.0
       subdir: packages/go-bytes
     go-exec:
       git: https://github.com/i-am-the-slime/purescript-go.git
-      ref: 353775e4356f0146917c3b0ace5a99d489009190
+      ref: v0.3.0
       subdir: packages/go-exec
     go-http:
       git: https://github.com/i-am-the-slime/purescript-go.git
-      ref: 353775e4356f0146917c3b0ace5a99d489009190
+      ref: v0.3.0
       subdir: packages/go-http
     go-io:
       git: https://github.com/i-am-the-slime/purescript-go.git
-      ref: 353775e4356f0146917c3b0ace5a99d489009190
+      ref: v0.3.0
       subdir: packages/go-io
     go-os:
       git: https://github.com/i-am-the-slime/purescript-go.git
-      ref: 353775e4356f0146917c3b0ace5a99d489009190
+      ref: v0.3.0
       subdir: packages/go-os
     go-time:
       git: https://github.com/i-am-the-slime/purescript-go.git
-      ref: 353775e4356f0146917c3b0ace5a99d489009190
+      ref: v0.3.0
       subdir: packages/go-time

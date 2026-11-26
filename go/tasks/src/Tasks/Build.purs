@@ -109,7 +109,7 @@ scriptsGoModule = String.joinWith "\n"
 
 -- | The iris-go runtime the Go that googoo writes needs.
 irisGoVersion :: String
-irisGoVersion = "v0.7.0"
+irisGoVersion = "v0.9.0"
 
 directoryOf :: FilePath -> FilePath
 directoryOf path = fromMaybe "." (String.lastIndexOf (Pattern "/") path <#> \at -> String.take at path)
